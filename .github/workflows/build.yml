@@ -2,6 +2,8 @@ name: Build firmware
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 permissions:
@@ -35,3 +37,15 @@ jobs:
 
       - name: Show firmware size
         run: pio run -t size
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v7
+        with:
+          name: gremlino-firmware
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            .pio/build/lolin_s2_mini/firmware.bin
+            .pio/build/lolin_s2_mini/bootloader.bin
+            .pio/build/lolin_s2_mini/partitions.bin
+            .pio/build/lolin_s2_mini/firmware.elf
