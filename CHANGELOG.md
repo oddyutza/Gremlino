@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.1.0 — 2026-10-02
+
+Keyboard mischief and Mischief Deck release.
+
+### Firmware
+
+- added USB HID keyboard alongside HID mouse
+- added persistent allowlisted prank mask
+- added keyboard pranks: Space, Tab, Page Up, Page Down, Home, End, Left/Right/Up/Down Arrow and paired Caps Lock blink
+- added Mild / Spicy / Chaos burst behavior
+- added explicit keyboard release on STOP ALL, Gremlin disable and BOOT panic
+- Gremlin Mode still always boots OFF
+- `/api/action` remains allowlisted; no arbitrary text or keycode injection
+- bumped firmware version to 1.1.0
+
+### WebUI
+
+- redesigned Gremlin Mode around a visual **Mischief Deck**
+- individual prank tiles can be enabled/disabled
+- every tile has a manual test control
+- added All / Mouse / Keys quick deck presets
+- added live intensity behavior summary
+- HID status now reflects composite Mouse + Keyboard operation
+- retained Wi-Fi, USB identity, telemetry, reboot and factory-reset controls
+
+### Documentation
+
+- README updated for 1.1 composite HID behavior and safe keyboard action set
+- documented prank timing/burst behavior and API limits
+- retained PlatformIO and standalone esptool flashing instructions
+
 ## 1.0.0 — 2026-10-02
 
 Initial complete software release.
@@ -8,13 +39,13 @@ Initial complete software release.
 
 - ESP32-S2 native USB HID mouse support
 - Away Killer with random interval and configurable movement amplitude
-- Gremlin Mode with Mild, Spicy and Chaos scheduling profiles
+- mouse-only Gremlin Mode with Mild / Spicy / Chaos scheduling
 - manual Nudge and Orbit actions
 - persistent Preferences/NVS configuration
 - Wi-Fi SoftAP and captive DNS portal
 - editable AP SSID/password
+- selectable USB identity profiles with stable chip-derived serial
 - local status, config, action, network, USB identity and system APIs
-- selectable USB identity profiles with a stable chip-derived serial
 - reboot and factory-reset controls
 - BOOT tap panic stop
 - BOOT 7-second factory-reset recovery
@@ -35,5 +66,5 @@ Initial complete software release.
 
 - PlatformIO target pinned to `espressif32@7.1.3`
 - CI pinned to Ubuntu 24.04, Python 3.13 and PlatformIO 6.2.0
+- standalone flash artifact with esptool instructions
 - hardware acceptance checklist
-- project README and API overview
