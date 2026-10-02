@@ -28,6 +28,7 @@ struct Settings {
   uint16_t sessionMinutes = 60;
   String apSsid;
   String apPassword;
+  String usbIdentity = "gremlino";
 };
 
 Settings settings;
@@ -45,6 +46,48 @@ bool factoryResetTriggered = false;
 uint32_t bootPressedAt = 0;
 
 String lastAction = "Boot";
+
+struct UsbIdentityProfile {
+  const char *key;
+  const char *label;
+  const char *manufacturer;
+  const char *product;
+};
+
+static const UsbIdentityProfile USB_IDENTITIES[] = {
+    {"gremlino", "Gremlino", "Gremlino", "Gremlino"},
+    {"receiver", "USB Receiver", "Generic", "USB Receiver"},
+    {"office_mouse", "Office Mouse", "Generic", "Office Mouse"},
+    {"desktop_input", "Desktop Input", "Generic", "Desktop Input Device"},
+};
+
+static const UsbIdentityProfile &usbIdentityProfile(const String &key) {
+  for (const auto &profile : USB_IDENTITIES) {
+    if (key == profile.key) {
+      return profile;
+    }
+  }
+
+  return USB_IDENTITIES[0];
+}
+
+static bool validUsbIdentity(const String &key) {
+  for (const auto &profile : USB_IDENTITIES) {
+    if (key == profile.key) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static String usbSerialNumber() {
+  char serial[13];
+  const uint64_t chipId = ESP.getEfuseMac();
+  snprintf(serial, sizeof(serial), "%012llX",
+           static_cast<unsigned long long>(chipId & 0xFFFFFFFFFFFFULL));
+  return String(serial);
+}
 
 static bool reached(uint32_t now, uint32_t target) {
   return target != 0 && static_cast<int32_t>(now - target) >= 0;
@@ -130,6 +173,7 @@ static void saveSettings() {
   prefs.putUShort("session", settings.sessionMinutes);
   prefs.putString("ssid", settings.apSsid);
   prefs.putString("pass", settings.apPassword);
+  prefs.putString("usbprof", settings.usbIdentity);
 }
 
 static void loadSettings() {
@@ -153,6 +197,11 @@ static void loadSettings() {
 
   settings.apSsid = prefs.getString("ssid", defaultApSsid());
   settings.apPassword = prefs.getString("pass", GREMLINO_AP_PASSWORD);
+  settings.usbIdentity = prefs.getString("usbprof", "gremlino");
+
+  if (!validUsbIdentity(settings.usbIdentity)) {
+    settings.usbIdentity = "gremlino";
+  }
 
   if (!validSsid(settings.apSsid)) {
     settings.apSsid = defaultApSsid();
@@ -444,6 +493,33 @@ static void sendStatus() {
   json += jsonEscape(settings.apSsid);
   json += "\"";
 
+  const UsbIdentityProfile &identity = usbIdentityProfile(settings.usbIdentity);
+  json += ",\"usb_identity\":\"";
+  json += identity.key;
+  json += "\"";
+
+  json += ",\"usb_identity_label\":\"";
+  json += identity.label;
+  json += "\"";
+
+  json += ",\"usb_manufacturer\":\"";
+  json += jsonEscape(USB.manufacturerName());
+  json += "\"";
+
+  json += ",\"usb_product\":\"";
+  json += jsonEscape(USB.productName());
+  json += "\"";
+
+  json += ",\"usb_serial\":\"";
+  json += jsonEscape(USB.serialNumber());
+  json += "\"";
+
+  char usbId[10];
+  snprintf(usbId, sizeof(usbId), "%04X:%04X", USB.VID(), USB.PID());
+  json += ",\"usb_vid_pid\":\"";
+  json += usbId;
+  json += "\"";
+
   json += ",\"ip\":\"";
   json += WiFi.softAPIP().toString();
   json += "\"";
@@ -555,6 +631,30 @@ static void handleNetwork() {
               "{\"ok\":true,\"reboot_required\":true}");
 }
 
+static void handleUsbIdentity() {
+  if (!server.hasArg("profile")) {
+    server.send(400, "application/json",
+                "{\"ok\":false,\"error\":\"Missing USB identity profile\"}");
+    return;
+  }
+
+  const String profile = server.arg("profile");
+
+  if (!validUsbIdentity(profile)) {
+    server.send(400, "application/json",
+                "{\"ok\":false,\"error\":\"Unknown USB identity profile\"}");
+    return;
+  }
+
+  settings.usbIdentity = profile;
+  saveSettings();
+
+  lastAction = "USB identity saved";
+  sendNoCache();
+  server.send(200, "application/json",
+              "{\"ok\":true,\"reboot_required\":true}");
+}
+
 static bool parseEnabled() {
   return server.hasArg("enabled") && server.arg("enabled") == "1";
 }
@@ -628,6 +728,7 @@ static void setupWebServer() {
   server.on("/api/status", HTTP_GET, sendStatus);
   server.on("/api/config", HTTP_POST, handleConfig);
   server.on("/api/network", HTTP_POST, handleNetwork);
+  server.on("/api/usb", HTTP_POST, handleUsbIdentity);
   server.on("/api/action", HTTP_POST, handleAction);
   server.on("/api/system", HTTP_POST, handleSystem);
 
@@ -663,6 +764,13 @@ static void setupAccessPoint() {
 }
 
 static void setupUsb() {
+  const UsbIdentityProfile &identity = usbIdentityProfile(settings.usbIdentity);
+  const String serial = usbSerialNumber();
+
+  USB.manufacturerName(identity.manufacturer);
+  USB.productName(identity.product);
+  USB.serialNumber(serial.c_str());
+
   USB.onEvent(usbEventCallback);
   Mouse.begin();
   USB.begin();
@@ -753,6 +861,9 @@ void setup() {
   Serial.printf("Gremlino %s ready\n", GREMLINO_VERSION);
   Serial.printf("AP: %s\n", settings.apSsid.c_str());
   Serial.printf("IP: %s\n", WiFi.softAPIP().toString().c_str());
+  Serial.printf("USB identity: %s / %s / %s\n",
+                USB.manufacturerName(), USB.productName(),
+                USB.serialNumber());
 }
 
 void loop() {
