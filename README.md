@@ -41,6 +41,73 @@ platform = espressif32@7.1.3
 
 The current PlatformIO platform resolves Arduino-ESP32 2.0.17 for this environment.
 
+## Flash the board
+
+The recommended way to flash Gremlino is through PlatformIO. The project already pins the correct ESP32-S2 platform and board profile, so PlatformIO handles the bootloader, partition table and firmware offsets automatically.
+
+### 1. Install PlatformIO
+
+```bash
+python -m pip install "platformio==6.2.0"
+```
+
+Clone the repository and enter it:
+
+```bash
+git clone https://github.com/oddyutza/Gremlino.git
+cd Gremlino
+```
+
+### 2. Connect the ESP32-S2 Mini
+
+Connect the board directly by USB-C using a **data-capable** cable.
+
+Check that PlatformIO can see a serial/upload port:
+
+```bash
+pio device list
+```
+
+### 3. Build and upload
+
+```bash
+pio run
+pio run -t upload
+```
+
+If more than one serial device is connected, specify the port explicitly:
+
+```bash
+# Windows example
+pio run -t upload --upload-port COM7
+
+# Linux example
+pio run -t upload --upload-port /dev/ttyACM0
+```
+
+### If the board is not detected for upload
+
+Force the ESP32-S2 into its ROM bootloader:
+
+1. hold **BOOT**;
+2. tap **RESET** while still holding BOOT — or keep BOOT held while reconnecting USB if the clone has no RESET button;
+3. release **BOOT**;
+4. run `pio run -t upload` again.
+
+After a successful flash, reset or reconnect the board once. Gremlino should then expose its USB HID interface and create the `Gremlino-XXXX` Wi-Fi network.
+
+### Serial monitor
+
+For first bring-up:
+
+```bash
+pio device monitor
+```
+
+Expected startup output includes the firmware version, AP name and local IP address.
+
+> GitHub Actions also publishes a `gremlino-firmware` build artifact containing `firmware.bin`, `bootloader.bin`, `partitions.bin` and `firmware.elf`. For normal flashing, the PlatformIO upload command above is preferred because it applies the correct image layout automatically.
+
 ## First boot
 
 1. Build and flash Gremlino.
