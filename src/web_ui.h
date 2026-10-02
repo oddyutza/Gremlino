@@ -48,7 +48,7 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
 
     button,input,select { font:inherit; }
     button { -webkit-tap-highlight-color:transparent; }
-    button:focus-visible,input:focus-visible,select:focus-visible {
+    button:focus-visible,input:focus-visible,select:focus-visible,.trick:focus-visible {
       outline:2px solid var(--lime);
       outline-offset:2px;
     }
@@ -286,6 +286,7 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
       text-align:left;
       transition:.16s ease;
       overflow:hidden;
+      user-select:none;
     }
     .trick:hover { border-color:var(--line2); transform:translateY(-1px); }
     .trick.active {
@@ -707,23 +708,39 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
       els.modeSummary.textContent=summaryForIntensity();
     }
 
+    async function togglePrank(prank) {
+      prankMask ^= prank.bit;
+      renderDeck();
+      try { await saveConfig(true); } catch (error) { showToast(error.message||"Could not save deck",true); }
+    }
+
     function renderDeck() {
       els.deck.innerHTML="";
       PRANKS.forEach(prank => {
-        const tile=document.createElement("button");
-        tile.type="button";
+        const tile=document.createElement("div");
         tile.className="trick "+prank.kind+((prankMask&prank.bit)?" active":"");
-        tile.innerHTML='<span class="icon">'+prank.icon+'</span><span class="name">'+prank.name+'</span><span class="kind">'+prank.kind+'</span><button type="button" class="test" title="Test">▶</button>';
+        tile.setAttribute("role","button");
+        tile.setAttribute("aria-pressed",(prankMask&prank.bit)?"true":"false");
+        tile.tabIndex=0;
+        tile.innerHTML='<span class="icon">'+prank.icon+'</span><span class="name">'+prank.name+'</span><span class="kind">'+prank.kind+'</span><button type="button" class="test" title="Test '+prank.name+'" aria-label="Test '+prank.name+'">▶</button>';
+
         tile.addEventListener("click",async event => {
           if (event.target.closest(".test")) return;
-          prankMask ^= prank.bit;
-          renderDeck();
-          try { await saveConfig(true); } catch (error) { showToast(error.message||"Could not save deck",true); }
+          await togglePrank(prank);
         });
+
+        tile.addEventListener("keydown",async event => {
+          if (event.target.closest(".test")) return;
+          if (event.key!=="Enter" && event.key!==" ") return;
+          event.preventDefault();
+          await togglePrank(prank);
+        });
+
         tile.querySelector(".test").addEventListener("click",async event => {
           event.stopPropagation();
           try { await runAction(prank.action); } catch (_) {}
         });
+
         els.deck.appendChild(tile);
       });
       const count=PRANKS.filter(p => prankMask&p.bit).length;
