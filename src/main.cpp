@@ -5,12 +5,13 @@
 #include <WiFi.h>
 
 #include "USB.h"
+#include "USBHID.h"
 #include "USBHIDMouse.h"
 
 #include "gremlino_config.h"
 #include "web_ui.h"
 
-USBHID HID;
+USBHID Hid;
 USBHIDMouse Mouse;
 
 DNSServer dnsServer;
@@ -25,6 +26,8 @@ struct Settings {
   uint8_t amplitude = 2;
   uint8_t intensity = 1;
   uint16_t sessionMinutes = 60;
+  String apSsid;
+  String apPassword;
 };
 
 Settings settings;
@@ -35,17 +38,68 @@ volatile bool usbSuspended = false;
 uint32_t nextIdleAt = 0;
 uint32_t nextGremlinAt = 0;
 uint32_t gremlinUntil = 0;
+uint32_t restartAt = 0;
 
-bool previousBootButton = HIGH;
+bool bootPressed = false;
+bool factoryResetTriggered = false;
+uint32_t bootPressedAt = 0;
+
 String lastAction = "Boot";
-char apSsid[32];
 
 static bool reached(uint32_t now, uint32_t target) {
   return target != 0 && static_cast<int32_t>(now - target) >= 0;
 }
 
-static uint32_t secondsFromNow(uint16_t seconds) {
-  return millis() + static_cast<uint32_t>(seconds) * 1000UL;
+static String defaultApSsid() {
+  char suffix[5];
+  const uint64_t chipId = ESP.getEfuseMac();
+  snprintf(suffix, sizeof(suffix), "%04X", static_cast<uint16_t>(chipId & 0xFFFFU));
+
+  String ssid = GREMLINO_AP_PREFIX;
+  ssid += "-";
+  ssid += suffix;
+  return ssid;
+}
+
+static bool validSsid(const String &ssid) {
+  return ssid.length() >= 1 && ssid.length() <= 32;
+}
+
+static bool validPassword(const String &password) {
+  return password.length() >= 8 && password.length() <= 63;
+}
+
+static String jsonEscape(const String &input) {
+  String out;
+  out.reserve(input.length() + 8);
+
+  for (size_t i = 0; i < input.length(); ++i) {
+    const char c = input.charAt(i);
+    switch (c) {
+      case '\\':
+        out += "\\\\";
+        break;
+      case '"':
+        out += "\\\"";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      case '\r':
+        out += "\\r";
+        break;
+      case '\t':
+        out += "\\t";
+        break;
+      default:
+        if (static_cast<uint8_t>(c) >= 0x20) {
+          out += c;
+        }
+        break;
+    }
+  }
+
+  return out;
 }
 
 static uint32_t randomSecondsFromNow(uint16_t minSec, uint16_t maxSec) {
@@ -62,7 +116,9 @@ static uint32_t randomSecondsFromNow(uint16_t minSec, uint16_t maxSec) {
     return millis() + minMs;
   }
 
-  return millis() + static_cast<uint32_t>(random(static_cast<long>(minMs), static_cast<long>(maxMs + 1UL)));
+  return millis() +
+         static_cast<uint32_t>(random(static_cast<long>(minMs),
+                                      static_cast<long>(maxMs + 1UL)));
 }
 
 static void saveSettings() {
@@ -72,10 +128,13 @@ static void saveSettings() {
   prefs.putUChar("amp", settings.amplitude);
   prefs.putUChar("level", settings.intensity);
   prefs.putUShort("session", settings.sessionMinutes);
+  prefs.putString("ssid", settings.apSsid);
+  prefs.putString("pass", settings.apPassword);
 }
 
 static void loadSettings() {
   settings.idleEnabled = prefs.getBool("idle", false);
+  settings.gremlinEnabled = false;  // Never restore Gremlin Mode after reboot.
   settings.minSec = constrain(prefs.getUShort("minsec", 20), 5, 300);
   settings.maxSec = constrain(prefs.getUShort("maxsec", 40), 5, 300);
   settings.amplitude = constrain(prefs.getUChar("amp", 2), 1, 8);
@@ -83,7 +142,8 @@ static void loadSettings() {
 
   const uint16_t storedSession = prefs.getUShort("session", 60);
   settings.sessionMinutes =
-      (storedSession == 0 || storedSession == 15 || storedSession == 60 || storedSession == 240)
+      (storedSession == 0 || storedSession == 15 || storedSession == 60 ||
+       storedSession == 240)
           ? storedSession
           : 60;
 
@@ -91,8 +151,16 @@ static void loadSettings() {
     settings.maxSec = settings.minSec;
   }
 
-  // Deliberately never restore Gremlin Mode after a reboot.
-  settings.gremlinEnabled = false;
+  settings.apSsid = prefs.getString("ssid", defaultApSsid());
+  settings.apPassword = prefs.getString("pass", GREMLINO_AP_PASSWORD);
+
+  if (!validSsid(settings.apSsid)) {
+    settings.apSsid = defaultApSsid();
+  }
+
+  if (!validPassword(settings.apPassword)) {
+    settings.apPassword = GREMLINO_AP_PASSWORD;
+  }
 }
 
 static void scheduleIdle() {
@@ -121,7 +189,7 @@ static void scheduleGremlin() {
 }
 
 static bool hidReady() {
-  return HID.ready();
+  return Hid.ready();
 }
 
 static bool nudge(uint8_t maxAmplitude) {
@@ -150,25 +218,28 @@ static bool orbit(uint8_t size) {
   const int8_t s = static_cast<int8_t>(constrain(size, 2, 20));
 
   Mouse.move(s, 0, 0);
-  delay(60);
+  delay(55);
   Mouse.move(0, s, 0);
-  delay(60);
+  delay(55);
   Mouse.move(-s, 0, 0);
-  delay(60);
+  delay(55);
   Mouse.move(0, -s, 0);
 
   lastAction = "Mouse orbit";
   return true;
 }
 
-static void stopAll(const char *reason = "Stopped") {
+static void stopAll(const char *reason = "Stopped", bool persist = true) {
   settings.idleEnabled = false;
   settings.gremlinEnabled = false;
   nextIdleAt = 0;
   nextGremlinAt = 0;
   gremlinUntil = 0;
   lastAction = reason;
-  saveSettings();
+
+  if (persist) {
+    saveSettings();
+  }
 }
 
 static void setIdleEnabled(bool enabled) {
@@ -183,10 +254,13 @@ static void setGremlinEnabled(bool enabled) {
 
   if (enabled) {
     if (settings.sessionMinutes > 0) {
-      gremlinUntil = millis() + static_cast<uint32_t>(settings.sessionMinutes) * 60UL * 1000UL;
+      gremlinUntil =
+          millis() +
+          static_cast<uint32_t>(settings.sessionMinutes) * 60UL * 1000UL;
     } else {
       gremlinUntil = 0;
     }
+
     scheduleGremlin();
     lastAction = "Gremlin Mode enabled";
   } else {
@@ -215,8 +289,20 @@ static void runGremlinAction() {
   }
 }
 
-static int32_t nextActionSeconds() {
+static int32_t secondsUntil(uint32_t target) {
+  if (target == 0) {
+    return -1;
+  }
+
   const uint32_t now = millis();
+  if (reached(now, target)) {
+    return 0;
+  }
+
+  return static_cast<int32_t>((target - now + 999UL) / 1000UL);
+}
+
+static int32_t nextActionSeconds() {
   uint32_t next = 0;
 
   if (settings.idleEnabled && nextIdleAt != 0) {
@@ -229,18 +315,30 @@ static int32_t nextActionSeconds() {
     }
   }
 
-  if (next == 0) {
+  return secondsUntil(next);
+}
+
+static int32_t gremlinRemainingSeconds() {
+  if (!settings.gremlinEnabled || gremlinUntil == 0) {
     return -1;
   }
 
-  if (reached(now, next)) {
-    return 0;
-  }
-
-  return static_cast<int32_t>((next - now + 999UL) / 1000UL);
+  return secondsUntil(gremlinUntil);
 }
 
-static void usbEventCallback(void *arg, esp_event_base_t eventBase, int32_t eventId, void *eventData) {
+static void scheduleRestart(const char *reason) {
+  stopAll(reason, false);
+  restartAt = millis() + GREMLINO_RESTART_DELAY_MS;
+}
+
+static void factoryReset() {
+  stopAll("Factory reset", false);
+  prefs.clear();
+  restartAt = millis() + GREMLINO_RESTART_DELAY_MS;
+}
+
+static void usbEventCallback(void *arg, esp_event_base_t eventBase,
+                             int32_t eventId, void *eventData) {
   (void)arg;
   (void)eventData;
 
@@ -273,11 +371,13 @@ static void usbEventCallback(void *arg, esp_event_base_t eventBase, int32_t even
 }
 
 static void sendNoCache() {
-  server.sendHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  server.sendHeader("Cache-Control",
+                    "no-store, no-cache, must-revalidate, max-age=0");
   server.sendHeader("Pragma", "no-cache");
 }
 
 static void serveUi() {
+  sendNoCache();
   server.send_P(200, "text/html; charset=utf-8", GREMLINO_INDEX_HTML);
 }
 
@@ -288,59 +388,99 @@ static void redirectToUi() {
 
 static void sendStatus() {
   String json;
-  json.reserve(420);
+  json.reserve(720);
 
   json += "{";
-  json += "\"hid_ready\":";
+  json += "\"version\":\"";
+  json += GREMLINO_VERSION;
+  json += "\"";
+
+  json += ",\"hid_ready\":";
   json += hidReady() ? "true" : "false";
+
   json += ",\"usb_started\":";
   json += usbStarted ? "true" : "false";
+
   json += ",\"usb_suspended\":";
   json += usbSuspended ? "true" : "false";
+
   json += ",\"wifi_clients\":";
   json += String(WiFi.softAPgetStationNum());
+
   json += ",\"uptime\":";
   json += String(millis() / 1000UL);
+
+  json += ",\"free_heap\":";
+  json += String(ESP.getFreeHeap());
+
   json += ",\"idle_enabled\":";
   json += settings.idleEnabled ? "true" : "false";
+
   json += ",\"gremlin_enabled\":";
   json += settings.gremlinEnabled ? "true" : "false";
+
   json += ",\"min_sec\":";
   json += String(settings.minSec);
+
   json += ",\"max_sec\":";
   json += String(settings.maxSec);
+
   json += ",\"amplitude\":";
   json += String(settings.amplitude);
+
   json += ",\"intensity\":";
   json += String(settings.intensity);
+
   json += ",\"session_min\":";
   json += String(settings.sessionMinutes);
+
   json += ",\"next_in\":";
   json += String(nextActionSeconds());
+
+  json += ",\"gremlin_remaining\":";
+  json += String(gremlinRemainingSeconds());
+
+  json += ",\"ap_ssid\":\"";
+  json += jsonEscape(settings.apSsid);
+  json += "\"";
+
+  json += ",\"ip\":\"";
+  json += WiFi.softAPIP().toString();
+  json += "\"";
+
+  json += ",\"restart_pending\":";
+  json += restartAt != 0 ? "true" : "false";
+
   json += ",\"last_action\":\"";
-  json += lastAction;
-  json += "\"}";
+  json += jsonEscape(lastAction);
+  json += "\"";
+
+  json += "}";
 
   sendNoCache();
   server.send(200, "application/json", json);
 }
 
-static uint16_t readClampedU16(const char *name, uint16_t current, uint16_t low, uint16_t high) {
+static uint16_t readClampedU16(const char *name, uint16_t current,
+                               uint16_t low, uint16_t high) {
   if (!server.hasArg(name)) {
     return current;
   }
 
   const long value = server.arg(name).toInt();
-  return static_cast<uint16_t>(constrain(value, static_cast<long>(low), static_cast<long>(high)));
+  return static_cast<uint16_t>(
+      constrain(value, static_cast<long>(low), static_cast<long>(high)));
 }
 
-static uint8_t readClampedU8(const char *name, uint8_t current, uint8_t low, uint8_t high) {
+static uint8_t readClampedU8(const char *name, uint8_t current, uint8_t low,
+                             uint8_t high) {
   if (!server.hasArg(name)) {
     return current;
   }
 
   const long value = server.arg(name).toInt();
-  return static_cast<uint8_t>(constrain(value, static_cast<long>(low), static_cast<long>(high)));
+  return static_cast<uint8_t>(
+      constrain(value, static_cast<long>(low), static_cast<long>(high)));
 }
 
 static void handleConfig() {
@@ -358,7 +498,8 @@ static void handleConfig() {
 
   if (server.hasArg("session")) {
     const int requested = server.arg("session").toInt();
-    if (requested == 0 || requested == 15 || requested == 60 || requested == 240) {
+    if (requested == 0 || requested == 15 || requested == 60 ||
+        requested == 240) {
       settings.sessionMinutes = static_cast<uint16_t>(requested);
     }
   }
@@ -376,13 +517,52 @@ static void handleConfig() {
   server.send(200, "application/json", "{\"ok\":true}");
 }
 
+static void handleNetwork() {
+  if (!server.hasArg("ssid")) {
+    server.send(400, "application/json",
+                "{\"ok\":false,\"error\":\"Missing SSID\"}");
+    return;
+  }
+
+  String ssid = server.arg("ssid");
+  ssid.trim();
+
+  if (!validSsid(ssid)) {
+    server.send(400, "application/json",
+                "{\"ok\":false,\"error\":\"SSID must be 1-32 characters\"}");
+    return;
+  }
+
+  String password = settings.apPassword;
+  if (server.hasArg("password") && server.arg("password").length() > 0) {
+    password = server.arg("password");
+
+    if (!validPassword(password)) {
+      server.send(
+          400, "application/json",
+          "{\"ok\":false,\"error\":\"Password must be 8-63 characters\"}");
+      return;
+    }
+  }
+
+  settings.apSsid = ssid;
+  settings.apPassword = password;
+  saveSettings();
+
+  lastAction = "Network settings saved";
+  sendNoCache();
+  server.send(200, "application/json",
+              "{\"ok\":true,\"reboot_required\":true}");
+}
+
 static bool parseEnabled() {
   return server.hasArg("enabled") && server.arg("enabled") == "1";
 }
 
 static void handleAction() {
   if (!server.hasArg("name")) {
-    server.send(400, "text/plain", "Missing action");
+    server.send(400, "application/json",
+                "{\"ok\":false,\"error\":\"Missing action\"}");
     return;
   }
 
@@ -396,16 +576,19 @@ static void handleAction() {
     stopAll("STOP ALL");
   } else if (name == "nudge") {
     if (!nudge(settings.amplitude)) {
-      server.send(409, "text/plain", "USB HID is not ready");
+      server.send(409, "application/json",
+                  "{\"ok\":false,\"error\":\"USB HID is not ready\"}");
       return;
     }
   } else if (name == "orbit") {
     if (!orbit(static_cast<uint8_t>(5 + settings.intensity * 3))) {
-      server.send(409, "text/plain", "USB HID is not ready");
+      server.send(409, "application/json",
+                  "{\"ok\":false,\"error\":\"USB HID is not ready\"}");
       return;
     }
   } else {
-    server.send(400, "text/plain", "Unknown action");
+    server.send(400, "application/json",
+                "{\"ok\":false,\"error\":\"Unknown action\"}");
     return;
   }
 
@@ -413,11 +596,42 @@ static void handleAction() {
   server.send(200, "application/json", "{\"ok\":true}");
 }
 
+static void handleSystem() {
+  if (!server.hasArg("name")) {
+    server.send(400, "application/json",
+                "{\"ok\":false,\"error\":\"Missing system action\"}");
+    return;
+  }
+
+  const String name = server.arg("name");
+
+  if (name == "reboot") {
+    sendNoCache();
+    server.send(200, "application/json", "{\"ok\":true}");
+    scheduleRestart("Restart requested");
+    return;
+  }
+
+  if (name == "factory_reset") {
+    sendNoCache();
+    server.send(200, "application/json", "{\"ok\":true}");
+    factoryReset();
+    return;
+  }
+
+  server.send(400, "application/json",
+              "{\"ok\":false,\"error\":\"Unknown system action\"}");
+}
+
 static void setupWebServer() {
   server.on("/", HTTP_GET, serveUi);
   server.on("/api/status", HTTP_GET, sendStatus);
   server.on("/api/config", HTTP_POST, handleConfig);
+  server.on("/api/network", HTTP_POST, handleNetwork);
   server.on("/api/action", HTTP_POST, handleAction);
+  server.on("/api/system", HTTP_POST, handleSystem);
+
+  server.on("/favicon.ico", HTTP_GET, []() { server.send(204); });
 
   // Common captive-portal probes.
   server.on("/generate_204", HTTP_GET, serveUi);
@@ -434,12 +648,16 @@ static void setupWebServer() {
 }
 
 static void setupAccessPoint() {
-  const uint64_t chipId = ESP.getEfuseMac();
-  snprintf(apSsid, sizeof(apSsid), "Gremlino-%04X", static_cast<uint16_t>(chipId & 0xFFFFU));
-
   WiFi.mode(WIFI_AP);
   WiFi.setSleep(false);
-  WiFi.softAP(apSsid, GREMLINO_AP_PASSWORD);
+  WiFi.softAPsetHostname(GREMLINO_HOSTNAME);
+
+  if (!WiFi.softAP(settings.apSsid, settings.apPassword)) {
+    settings.apSsid = defaultApSsid();
+    settings.apPassword = GREMLINO_AP_PASSWORD;
+    saveSettings();
+    WiFi.softAP(settings.apSsid, settings.apPassword);
+  }
 
   dnsServer.start(GREMLINO_DNS_PORT, "*", WiFi.softAPIP());
 }
@@ -451,19 +669,39 @@ static void setupUsb() {
 }
 
 static void updatePanicButton() {
-  const bool current = digitalRead(GREMLINO_BOOT_PIN);
+  const bool pressed = digitalRead(GREMLINO_BOOT_PIN) == LOW;
+  const uint32_t now = millis();
 
-  if (previousBootButton == HIGH && current == LOW) {
+  if (pressed && !bootPressed) {
+    bootPressed = true;
+    factoryResetTriggered = false;
+    bootPressedAt = now;
     stopAll("Physical panic button");
   }
 
-  previousBootButton = current;
+  if (pressed && bootPressed && !factoryResetTriggered &&
+      static_cast<uint32_t>(now - bootPressedAt) >=
+          GREMLINO_FACTORY_RESET_HOLD_MS) {
+    factoryResetTriggered = true;
+    factoryReset();
+  }
+
+  if (!pressed && bootPressed) {
+    bootPressed = false;
+    factoryResetTriggered = false;
+    bootPressedAt = 0;
+  }
 }
 
 static void updateSchedulers() {
+  if (restartAt != 0) {
+    return;
+  }
+
   const uint32_t now = millis();
 
-  if (settings.gremlinEnabled && gremlinUntil != 0 && reached(now, gremlinUntil)) {
+  if (settings.gremlinEnabled && gremlinUntil != 0 &&
+      reached(now, gremlinUntil)) {
     setGremlinEnabled(false);
     lastAction = "Gremlin session ended";
   }
@@ -485,9 +723,15 @@ static void updateSchedulers() {
   }
 }
 
+static void updateRestart() {
+  if (restartAt != 0 && reached(millis(), restartAt)) {
+    delay(25);
+    ESP.restart();
+  }
+}
+
 void setup() {
   pinMode(GREMLINO_BOOT_PIN, INPUT_PULLUP);
-  previousBootButton = digitalRead(GREMLINO_BOOT_PIN);
 
   Serial.begin(115200);
   delay(50);
@@ -506,8 +750,8 @@ void setup() {
   }
 
   Serial.println();
-  Serial.println("Gremlino ready");
-  Serial.printf("AP: %s\n", apSsid);
+  Serial.printf("Gremlino %s ready\n", GREMLINO_VERSION);
+  Serial.printf("AP: %s\n", settings.apSsid.c_str());
   Serial.printf("IP: %s\n", WiFi.softAPIP().toString().c_str());
 }
 
@@ -517,6 +761,7 @@ void loop() {
 
   updatePanicButton();
   updateSchedulers();
+  updateRestart();
 
   delay(2);
 }
