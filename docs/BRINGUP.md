@@ -1,4 +1,4 @@
-# Gremlino 1.0 hardware acceptance
+# Gremlino 1.1 hardware acceptance
 
 Use this checklist when the ESP32-S2 Mini arrives.
 
@@ -34,9 +34,10 @@ pio device monitor
 
 Expected output includes:
 
-- `Gremlino 1.0.0 ready`
+- `Gremlino 1.1.0 ready`
 - AP name such as `Gremlino-1A2B`
 - local IP `192.168.4.1`
+- active USB identity strings
 
 ## 4. Wi-Fi and captive portal
 
@@ -47,20 +48,60 @@ Expected output includes:
 - change SSID/password in the Device section;
 - reboot and confirm the new credentials apply.
 
-## 5. USB HID
+## 5. Composite USB HID
 
 Keep both automatic modes OFF.
 
-Confirm:
+Confirm the host sees a composite device providing:
+
+- USB CDC serial
+- HID mouse
+- HID keyboard
+
+Confirm the dashboard reaches:
 
 - **USB: Active**
-- **HID: Ready**
+- **HID: Mouse + Keyboard**
 
-Run **Test nudge** and verify the pointer moves then returns.
+Record the actual host-visible VID:PID, manufacturer, product and serial.
 
-Run **Orbit** and verify the pattern closes near its starting point.
+## 6. Manual mouse actions
 
-## 6. Away Killer
+Run:
+
+- **Nudge** — pointer must move and return;
+- **Orbit** — pattern must close near its starting position.
+
+## 7. Manual keyboard actions
+
+Use each Mischief Deck test button once and confirm exactly one intended event occurs:
+
+- Space
+- Tab
+- Page Up
+- Page Down
+- Home
+- End
+- Left Arrow
+- Right Arrow
+- Up Arrow
+- Down Arrow
+- Caps Lock blink
+
+For Caps Lock blink, verify the LED/state returns to its original state after the paired toggle.
+
+Do not test inside unsaved or sensitive work; use a blank text/editor/browser test page.
+
+## 8. Mischief Deck persistence
+
+- disable several tiles;
+- save/reload the page;
+- confirm the deck selection persists;
+- reboot Gremlino;
+- confirm the selection still persists;
+- confirm Gremlin Mode itself is OFF after reboot.
+
+## 9. Away Killer
 
 Start with:
 
@@ -70,7 +111,7 @@ Start with:
 
 Verify multiple cycles and confirm the next-action countdown updates.
 
-## 7. Gremlin Mode
+## 10. Gremlin Mode
 
 Test in order:
 
@@ -78,31 +119,56 @@ Test in order:
 2. Spicy, 15 minutes
 3. Chaos, 15 minutes
 
-Confirm the session countdown expires and the mode disables itself.
+Verify:
 
-## 8. Panic and recovery
+- only selected Mischief Deck actions occur;
+- Mild emits single actions;
+- Spicy occasionally emits a short 2-action burst;
+- Chaos can emit 2–3 action bursts;
+- the session countdown expires and the mode disables itself.
 
-While a mode is active:
+## 11. Panic and keyboard release
 
-- tap BOOT: both modes must stop;
-- hold BOOT for 7 seconds: saved settings must clear and the board must reboot.
+While Gremlin Mode is active:
 
-After factory reset, confirm the default `Gremlino-XXXX` AP and `gremlino!` password return.
+- tap BOOT;
+- both automatic modes must stop;
+- no key may remain logically held;
+- no further scheduled mouse or keyboard action may occur.
 
-## 9. Reboot behavior
+Repeat using **STOP ALL ACTIVITY** in the WebUI.
 
-After a normal reboot:
+## 12. Factory reset
 
-- Gremlin Mode must be OFF;
-- Away Killer may restore its saved enabled state;
-- timing and network settings must persist.
+Hold BOOT for 7 seconds.
 
-## 10. Record exact hardware behavior
+Expected result:
+
+- saved Wi-Fi settings cleared;
+- USB identity returns to Gremlino;
+- Mischief Deck returns to defaults;
+- timing/mode settings return to defaults;
+- board reboots;
+- default `Gremlino-XXXX` AP and `gremlino!` password return.
+
+## 13. USB identity profiles
+
+For each preset:
+
+- Gremlino
+- USB Receiver
+- Office Mouse
+- Desktop Input
+
+Save, reboot and confirm manufacturer/product strings change while the board VID/PID remains unchanged.
+
+## 14. Record exact hardware behavior
 
 Update the README if the clone differs from the LOLIN profile, including:
 
 - board/model marking;
 - observed USB VID/PID;
+- actual composite interfaces shown by the host;
 - upload procedure;
 - BOOT/RESET behavior;
 - any native-USB quirk;

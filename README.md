@@ -2,32 +2,32 @@
 
 [![Build firmware](https://github.com/oddyutza/Gremlino/actions/workflows/build.yml/badge.svg)](https://github.com/oddyutza/Gremlino/actions/workflows/build.yml)
 
-**Gremlino 1.0** is a tiny ESP32-S2 USB HID mouse gadget with its own Wi-Fi hotspot and a polished local WebUI.
+**Gremlino 1.1** is a tiny ESP32-S2 USB HID mischief appliance with its own Wi-Fi hotspot and a polished local WebUI.
 
-It started from a simple idea: keep a workstation awake with tiny reversible mouse movement. Then the gremlin got Wi-Fi.
+It started as a mouse jiggler. Then the gremlin got Wi-Fi, a dashboard, USB identity profiles and a deliberately annoying — but tightly allowlisted — keyboard prank deck.
 
-> Software is complete and CI-built for the `lolin_s2_mini` target. Final hardware validation is intentionally tracked separately because the exact ESP32-S2 Mini clone is still in transit.
+> Built for devices you own or are explicitly authorized to test. Gremlino does not type arbitrary text, launch commands, open shells, use modifier shortcuts or expose a generic keyboard-injection endpoint.
 
-## Features
+## Highlights
 
-- **Away Killer** — random, configurable mouse nudges followed by an exact return.
-- **Gremlin Mode** — mouse-only randomized activity with Mild, Spicy and Chaos presets.
-- **Manual actions** — Nudge and Orbit from the dashboard.
-- **Local WebUI** — fully embedded HTML/CSS/JS; no CDN, cloud or Internet dependency.
-- **Wi-Fi SoftAP + captive portal** — connect directly to Gremlino from phone or laptop.
-- **Device settings** — change AP name/password and USB identity profile from the WebUI.
-- **System controls** — reboot and factory reset from the WebUI.
+- **Away Killer** — tiny reversible mouse nudges at a configurable random interval.
+- **Gremlin Mode** — randomized mouse + keyboard annoyances selected from a user-controlled Mischief Deck.
+- **Mild / Spicy / Chaos** — progressively shorter gaps and occasional 2–3 action bursts.
+- **Mischief Deck** — enable only the pranks you want; each action also has a manual test button.
+- **Local WebUI** — responsive, embedded HTML/CSS/JS; no CDN, cloud or Internet dependency.
+- **Wi-Fi SoftAP + captive portal** — control Gremlino directly from a phone or laptop.
+- **USB identity profiles** — preset-only host-visible manufacturer/product strings.
 - **Physical recovery** — tap BOOT for panic stop; hold BOOT for 7 seconds for factory reset.
-- **Persistent configuration** — Away Killer and timing/network settings survive reboot.
-- **Safe reboot behavior** — Gremlin Mode always starts OFF after reboot.
-- **Live telemetry** — HID state, USB state, clients, uptime, next action, session time, IP and free heap.
+- **Persistent settings** — Away Killer, deck, timing and device settings survive reboot.
+- **Safe boot behavior** — Gremlin Mode always starts OFF after reboot.
+- **Live telemetry** — USB/HID state, clients, uptime, next action, session time, IP, heap and USB identity.
 
 ## Hardware target
 
 Initial target:
 
 - ESP32-S2 Mini / LOLIN S2 Mini compatible board
-- ESP32-S2 with native USB
+- ESP32-S2 native USB
 - 4 MB flash
 - USB-C connected to the ESP32-S2 native USB interface
 - BOOT button on GPIO0
@@ -39,85 +39,122 @@ board = lolin_s2_mini
 platform = espressif32@7.1.3
 ```
 
-The current PlatformIO platform resolves Arduino-ESP32 2.0.17 for this environment.
+The pinned platform currently resolves Arduino-ESP32 2.0.17 for this environment.
+
+## USB interfaces
+
+Gremlino 1.1 enumerates as a composite USB device with:
+
+- USB CDC serial
+- HID mouse
+- HID keyboard
+
+The keyboard interface exists only for the built-in allowlisted prank actions.
+
+### USB identity profiles
+
+The WebUI can select one of these preset identities:
+
+- **Gremlino** — `Gremlino / Gremlino`
+- **USB Receiver** — `Generic / USB Receiver`
+- **Office Mouse** — `Generic / Office Mouse`
+- **Desktop Input** — `Generic / Desktop Input Device`
+
+The USB serial is stable and derived from the ESP32-S2 chip ID. Identity changes apply after reboot.
+
+VID/PID remain the board-profile defaults; Gremlino does not copy real third-party vendor VID/PID pairs.
+
+## Mischief Deck
+
+Gremlin Mode can randomly choose only from the actions enabled in the WebUI.
+
+### Mouse
+
+- Nudge
+- Orbit
+
+### Keyboard
+
+- Space
+- Tab
+- Page Up
+- Page Down
+- Home
+- End
+- Left Arrow
+- Right Arrow
+- Up Arrow
+- Down Arrow
+- Caps Lock blink
+
+Caps Lock blink is paired — Caps Lock is toggled and then toggled back after a short delay.
+
+There is intentionally **no** Backspace, Delete, Enter, modifier key, Win/Command shortcut, function-key launcher, arbitrary text field or command endpoint.
+
+### Intensity
+
+| Profile | Timing | Burst behavior |
+| --- | --- | --- |
+| Mild | 45–120 s | 1 action |
+| Spicy | 20–75 s | occasional 2-action burst |
+| Chaos | 8–35 s | occasional 2–3 action burst |
+
+Gremlin Mode can run for 15 minutes, 1 hour, 4 hours or until reboot. It is always OFF after boot.
 
 ## Flash the board
 
-The recommended way to flash Gremlino is through PlatformIO. The project already pins the correct ESP32-S2 platform and board profile, so PlatformIO handles the bootloader, partition table and firmware offsets automatically.
+### PlatformIO — recommended for development
 
-### 1. Install PlatformIO
+Install PlatformIO:
 
 ```bash
 python -m pip install "platformio==6.2.0"
 ```
 
-Clone the repository and enter it:
+Clone and enter the repository:
 
 ```bash
 git clone https://github.com/oddyutza/Gremlino.git
 cd Gremlino
 ```
 
-### 2. Connect the ESP32-S2 Mini
-
-Connect the board directly by USB-C using a **data-capable** cable.
-
-Check that PlatformIO can see a serial/upload port:
+Connect the ESP32-S2 Mini using a **data-capable** USB-C cable, then:
 
 ```bash
 pio device list
-```
-
-### 3. Build and upload
-
-```bash
 pio run
 pio run -t upload
 ```
 
-If more than one serial device is connected, specify the port explicitly:
+If more than one device is connected:
 
 ```bash
-# Windows example
+# Windows
 pio run -t upload --upload-port COM7
 
-# Linux example
+# Linux
 pio run -t upload --upload-port /dev/ttyACM0
 ```
 
-### If the board is not detected for upload
+### Force the ROM bootloader
 
-Force the ESP32-S2 into its ROM bootloader:
+If upload does not detect the board:
 
 1. hold **BOOT**;
-2. tap **RESET** while still holding BOOT — or keep BOOT held while reconnecting USB if the clone has no RESET button;
+2. tap **RESET** while BOOT is held — or reconnect USB while holding BOOT if the clone has no RESET button;
 3. release **BOOT**;
 4. run `pio run -t upload` again.
 
-After a successful flash, reset or reconnect the board once. Gremlino should then expose its USB HID interface and create the `Gremlino-XXXX` Wi-Fi network.
-
-### Serial monitor
-
-For first bring-up:
-
-```bash
-pio device monitor
-```
-
-Expected startup output includes the firmware version, AP name and local IP address.
-
 ### Flash the GitHub artifact with esptool
 
-Yes — the GitHub Actions artifact can also be flashed directly with **esptool**, without cloning the repository or installing PlatformIO.
-
-Download the latest `gremlino-firmware` artifact from GitHub Actions and extract it. It contains:
+GitHub Actions publishes a `gremlino-firmware` artifact containing:
 
 - `bootloader.bin`
 - `partitions.bin`
 - `boot_app0.bin`
 - `firmware.bin`
-- `firmware.elf` for debugging/symbols
-- `FLASH_WITH_ESPTOOL.txt` with the same command shown below
+- `firmware.elf`
+- `FLASH_WITH_ESPTOOL.txt`
 
 Install esptool:
 
@@ -125,10 +162,9 @@ Install esptool:
 python -m pip install esptool
 ```
 
-Put the ESP32-S2 into its bootloader if necessary, then flash all four images using the Arduino-ESP32 layout used by this project:
+Windows example:
 
 ```bash
-# Windows example
 esptool --chip esp32s2 --port COM7 --baud 921600 write-flash \
   --flash-mode dio --flash-freq 80m --flash-size 4MB \
   0x1000 bootloader.bin \
@@ -137,7 +173,7 @@ esptool --chip esp32s2 --port COM7 --baud 921600 write-flash \
   0x10000 firmware.bin
 ```
 
-Linux is identical apart from the port, for example:
+Linux example:
 
 ```bash
 esptool --chip esp32s2 --port /dev/ttyACM0 --baud 921600 write-flash \
@@ -148,20 +184,62 @@ esptool --chip esp32s2 --port /dev/ttyACM0 --baud 921600 write-flash \
   0x10000 firmware.bin
 ```
 
-If an older esptool 4.x installation is used, the command name may be written as `write_flash` instead of `write-flash`.
-
-For a normal developer workflow, `pio run -t upload` remains the easiest option because PlatformIO selects the port and image layout for you. **esptool is the convenient standalone option when you only have the published Gremlino firmware artifact.**
+Older esptool 4.x installations may use `write_flash` instead of `write-flash`.
 
 ## First boot
 
-1. Build and flash Gremlino.
-2. Connect the board to the host using its native USB port.
-3. Join the Wi-Fi network `Gremlino-XXXX`.
+1. Flash Gremlino.
+2. Reconnect/reset the board normally.
+3. Join `Gremlino-XXXX`.
 4. Default AP password: `gremlino!`
-5. Open `http://192.168.4.1/` if the captive portal does not appear automatically.
-6. Confirm **USB: Active** and **HID: Ready**.
-7. Use **Test nudge** before enabling an automatic mode.
-8. Change the default Wi-Fi password in **Device → Wi-Fi access point**.
+5. Open `http://192.168.4.1/` if the captive portal does not appear.
+6. Confirm **USB: Active** and **HID: Mouse + Keyboard**.
+7. Test a Nudge and one keyboard tile manually.
+8. Change the default Wi-Fi password.
+
+Serial monitor:
+
+```bash
+pio device monitor
+```
+
+Startup output includes firmware version, AP/IP and active USB identity.
+
+## Physical button
+
+BOOT / GPIO0:
+
+- **tap** — STOP ALL immediately and release keyboard state;
+- **hold 7 seconds** — factory reset and reboot.
+
+Factory reset clears Wi-Fi, USB identity, deck and mode/timing settings.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Client[Phone / laptop] -->|Wi-Fi SoftAP| UI[Embedded WebUI]
+    UI --> API[Local allowlisted API]
+    API --> State[Scheduler + Preferences]
+    Boot[BOOT panic / reset] --> State
+    State --> Mouse[USB HID Mouse]
+    State --> Keyboard[USB HID Keyboard]
+    Mouse --> Host[Host computer]
+    Keyboard --> Host
+```
+
+## Local API
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/api/status` | GET | Runtime/device/deck status |
+| `/api/config` | POST | Timing, intensity, session and prank-mask settings |
+| `/api/network` | POST | AP SSID/password |
+| `/api/usb` | POST | Select USB identity preset |
+| `/api/action` | POST | Allowlisted manual actions, mode toggles and STOP ALL |
+| `/api/system` | POST | Reboot or factory reset |
+
+The action API does not accept arbitrary keycodes or text.
 
 ## Build
 
@@ -173,82 +251,9 @@ Requirements:
 ```bash
 python -m pip install "platformio==6.2.0"
 pio run
-pio run -t upload
-pio device monitor
 ```
 
-CI is pinned to Ubuntu 24.04, Python 3.13, PlatformIO 6.2.0 and `espressif32@7.1.3`.
-
-## Modes
-
-### Away Killer
-
-Designed to be boring:
-
-- configurable 5–300 second minimum/maximum interval;
-- configurable 1–8 pixel amplitude;
-- each movement is followed by its inverse;
-- no clicks;
-- no keyboard events.
-
-### Gremlin Mode
-
-Mouse-only randomized activity:
-
-- **Mild** — long quiet periods and small nudges;
-- **Spicy** — shorter gaps and occasional orbit patterns;
-- **Chaos** — more frequent activity while retaining net-zero movement patterns;
-- 15 min / 1 h / 4 h session timeout, or until reboot;
-- always OFF after reboot.
-
-## USB identity profiles
-
-Gremlino can present a selectable host-visible USB identity. The profile changes the USB manufacturer/product strings and uses a stable serial derived from the ESP32-S2 chip ID.
-
-Available presets:
-
-- **Gremlino** — manufacturer `Gremlino`, product `Gremlino`
-- **USB Receiver** — generic receiver-style identity
-- **Office Mouse** — generic office-mouse identity
-- **Desktop Input** — generic desktop input-device identity
-
-The USB identity is selected from the WebUI and applied after reboot. The selector is intentionally preset-only: it does not accept arbitrary strings and it does not copy real third-party vendor VID/PID pairs.
-
-VID/PID remain the board profile defaults; only the descriptive identity changes.
-
-## Physical button
-
-BOOT / GPIO0 has two runtime functions:
-
-- **tap** — STOP ALL immediately;
-- **hold 7 seconds** — factory reset and reboot.
-
-Factory reset clears saved Wi-Fi, mode and timing settings.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    Client[Phone / laptop] -->|Wi-Fi SoftAP| UI[Embedded WebUI]
-    UI --> API[Local HTTP API]
-    API --> State[Scheduler + Preferences]
-    Boot[BOOT button] --> State
-    State --> HID[USB HID Mouse]
-    HID --> Host[Host computer]
-```
-
-## Local API
-
-| Endpoint | Method | Purpose |
-| --- | --- | --- |
-| `/api/status` | GET | Runtime/device status |
-| `/api/config` | POST | Away Killer and Gremlin settings |
-| `/api/network` | POST | AP SSID/password |
-| `/api/usb` | POST | Select USB identity profile |
-| `/api/action` | POST | Mode toggles, manual actions, STOP ALL |
-| `/api/system` | POST | Reboot or factory reset |
-
-The API is intentionally local to the Gremlino access point.
+CI is pinned to Ubuntu 24.04, Python 3.13, PlatformIO 6.2.0 and `espressif32@7.1.3`, and publishes the standalone flash bundle after every successful build on `main`.
 
 ## Project layout
 
@@ -266,9 +271,9 @@ Gremlino/
 
 ## Hardware validation
 
-The firmware build can be validated in CI, but USB enumeration, the exact clone's BOOT wiring and captive-portal behavior require the physical board.
+Software builds are covered by CI. USB enumeration, the exact clone's BOOT wiring, HID behavior and captive-portal behavior still require the physical board.
 
-Use [docs/BRINGUP.md](docs/BRINGUP.md) for the hardware acceptance pass. Anything discovered there should be treated as a board-specific correction to 1.0, not missing core functionality.
+Use [`docs/BRINGUP.md`](docs/BRINGUP.md) for the first-board acceptance pass.
 
 ---
 
