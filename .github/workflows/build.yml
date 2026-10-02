@@ -38,6 +38,17 @@ jobs:
       - name: Show firmware size
         run: pio run -t size
 
+      - name: Stage standalone flash bundle
+        run: |
+          cp .pio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin .pio/build/lolin_s2_mini/boot_app0.bin
+          cat > .pio/build/lolin_s2_mini/FLASH_WITH_ESPTOOL.txt <<'EOF'
+          Gremlino ESP32-S2 manual flash
+          
+          Replace PORT with your serial port, for example COM7 or /dev/ttyACM0.
+          
+          esptool --chip esp32s2 --port PORT --baud 921600 write-flash --flash-mode dio --flash-freq 80m --flash-size 4MB 0x1000 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
+          EOF
+
       - name: Upload firmware
         uses: actions/upload-artifact@v7
         with:
@@ -48,4 +59,6 @@ jobs:
             .pio/build/lolin_s2_mini/firmware.bin
             .pio/build/lolin_s2_mini/bootloader.bin
             .pio/build/lolin_s2_mini/partitions.bin
+            .pio/build/lolin_s2_mini/boot_app0.bin
             .pio/build/lolin_s2_mini/firmware.elf
+            .pio/build/lolin_s2_mini/FLASH_WITH_ESPTOOL.txt

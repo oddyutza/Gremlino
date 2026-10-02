@@ -106,7 +106,51 @@ pio device monitor
 
 Expected startup output includes the firmware version, AP name and local IP address.
 
-> GitHub Actions also publishes a `gremlino-firmware` build artifact containing `firmware.bin`, `bootloader.bin`, `partitions.bin` and `firmware.elf`. For normal flashing, the PlatformIO upload command above is preferred because it applies the correct image layout automatically.
+### Flash the GitHub artifact with esptool
+
+Yes — the GitHub Actions artifact can also be flashed directly with **esptool**, without cloning the repository or installing PlatformIO.
+
+Download the latest `gremlino-firmware` artifact from GitHub Actions and extract it. It contains:
+
+- `bootloader.bin`
+- `partitions.bin`
+- `boot_app0.bin`
+- `firmware.bin`
+- `firmware.elf` for debugging/symbols
+- `FLASH_WITH_ESPTOOL.txt` with the same command shown below
+
+Install esptool:
+
+```bash
+python -m pip install esptool
+```
+
+Put the ESP32-S2 into its bootloader if necessary, then flash all four images using the Arduino-ESP32 layout used by this project:
+
+```bash
+# Windows example
+esptool --chip esp32s2 --port COM7 --baud 921600 write-flash \
+  --flash-mode dio --flash-freq 80m --flash-size 4MB \
+  0x1000 bootloader.bin \
+  0x8000 partitions.bin \
+  0xe000 boot_app0.bin \
+  0x10000 firmware.bin
+```
+
+Linux is identical apart from the port, for example:
+
+```bash
+esptool --chip esp32s2 --port /dev/ttyACM0 --baud 921600 write-flash \
+  --flash-mode dio --flash-freq 80m --flash-size 4MB \
+  0x1000 bootloader.bin \
+  0x8000 partitions.bin \
+  0xe000 boot_app0.bin \
+  0x10000 firmware.bin
+```
+
+If an older esptool 4.x installation is used, the command name may be written as `write_flash` instead of `write-flash`.
+
+For a normal developer workflow, `pio run -t upload` remains the easiest option because PlatformIO selects the port and image layout for you. **esptool is the convenient standalone option when you only have the published Gremlino firmware artifact.**
 
 ## First boot
 
