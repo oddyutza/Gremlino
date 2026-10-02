@@ -1,25 +1,51 @@
-name: Build
+name: Build firmware
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   firmware:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    env:
+      PLATFORMIO_DISABLE_UPGRADE_CHECK: "true"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
-          python-version: "3.x"
-          cache: pip
+          python-version: "3.13"
 
       - name: Install PlatformIO
-        run: python -m pip install --upgrade platformio
+        run: python -m pip install --disable-pip-version-check "platformio==6.2.0"
+
+      - name: PlatformIO version
+        run: pio --version
 
       - name: Build
         run: pio run
+
+      - name: Show firmware size
+        run: pio run -t size
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v7
+        with:
+          name: gremlino-firmware
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            .pio/build/lolin_s2_mini/firmware.bin
+            .pio/build/lolin_s2_mini/bootloader.bin
+            .pio/build/lolin_s2_mini/partitions.bin
+            .pio/build/lolin_s2_mini/firmware.elf
