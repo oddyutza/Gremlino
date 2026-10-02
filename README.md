@@ -15,7 +15,7 @@ It started from a simple idea: keep a workstation awake with tiny reversible mou
 - **Manual actions** — Nudge and Orbit from the dashboard.
 - **Local WebUI** — fully embedded HTML/CSS/JS; no CDN, cloud or Internet dependency.
 - **Wi-Fi SoftAP + captive portal** — connect directly to Gremlino from phone or laptop.
-- **Device settings** — change AP name/password from the WebUI.
+- **Device settings** — change AP name/password and USB identity profile from the WebUI.
 - **System controls** — reboot and factory reset from the WebUI.
 - **Physical recovery** — tap BOOT for panic stop; hold BOOT for 7 seconds for factory reset.
 - **Persistent configuration** — Away Killer and timing/network settings survive reboot.
@@ -201,6 +201,21 @@ Mouse-only randomized activity:
 - 15 min / 1 h / 4 h session timeout, or until reboot;
 - always OFF after reboot.
 
+## USB identity profiles
+
+Gremlino can present a selectable host-visible USB identity. The profile changes the USB manufacturer/product strings and uses a stable serial derived from the ESP32-S2 chip ID.
+
+Available presets:
+
+- **Gremlino** — manufacturer `Gremlino`, product `Gremlino`
+- **USB Receiver** — generic receiver-style identity
+- **Office Mouse** — generic office-mouse identity
+- **Desktop Input** — generic desktop input-device identity
+
+The USB identity is selected from the WebUI and applied after reboot. The selector is intentionally preset-only: it does not accept arbitrary strings and it does not copy real third-party vendor VID/PID pairs.
+
+VID/PID remain the board profile defaults; only the descriptive identity changes.
+
 ## Physical button
 
 BOOT / GPIO0 has two runtime functions:
@@ -229,6 +244,7 @@ flowchart LR
 | `/api/status` | GET | Runtime/device status |
 | `/api/config` | POST | Away Killer and Gremlin settings |
 | `/api/network` | POST | AP SSID/password |
+| `/api/usb` | POST | Select USB identity profile |
 | `/api/action` | POST | Mode toggles, manual actions, STOP ALL |
 | `/api/system` | POST | Reboot or factory reset |
 
