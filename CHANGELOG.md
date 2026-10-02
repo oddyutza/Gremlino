@@ -13,7 +13,8 @@ Initial complete software release.
 - persistent Preferences/NVS configuration
 - Wi-Fi SoftAP and captive DNS portal
 - editable AP SSID/password
-- local status, config, action, network and system APIs
+- local status, config, action, network, USB identity and system APIs
+- selectable USB identity profiles with a stable chip-derived serial
 - reboot and factory-reset controls
 - BOOT tap panic stop
 - BOOT 7-second factory-reset recovery
@@ -25,7 +26,7 @@ Initial complete software release.
 - live USB/HID/Wi-Fi/uptime status
 - mode controls and timing configuration
 - live last-action, next-action and session countdown
-- device/network settings
+- device/network settings and USB identity selector
 - firmware version, IP and free-heap telemetry
 - reboot and factory-reset flows
 - no external assets or cloud dependencies
