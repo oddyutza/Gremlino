@@ -103,6 +103,7 @@ Mouse-only randomized activity:
 ```text
 Gremlino/
 ├── .github/workflows/build.yml
+├── docs/BRINGUP.md
 ├── include/gremlino_config.h
 ├── src/main.cpp
 ├── src/web_ui.h
@@ -113,7 +114,8 @@ Gremlino/
 
 ## Roadmap
 
-The first real hardware pass starts when the board arrives:
+The first real hardware pass starts when the board arrives. The step-by-step checklist lives in [`docs/BRINGUP.md`](docs/BRINGUP.md).
+
 
 - verify USB enumeration on the exact clone;
 - tune HID timings on Windows;
