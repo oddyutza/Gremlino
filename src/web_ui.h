@@ -728,9 +728,29 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
             </div>
 
             <div id="restartNotice" class="notice">
-              Network settings saved. Restart Gremlino to apply them.
+              Settings saved. Restart Gremlino to apply network or USB identity changes.
               <div class="toolbar">
                 <button id="restartFromNotice" class="btn ghost">Restart now</button>
+              </div>
+            </div>
+
+            <div class="danger-zone">
+              <h3 class="pane-title">USB identity</h3>
+
+              <div class="field">
+                <label class="caption" for="usbIdentity">Host-visible profile</label>
+                <select id="usbIdentity">
+                  <option value="gremlino">Gremlino</option>
+                  <option value="receiver">USB Receiver</option>
+                  <option value="office_mouse">Office Mouse</option>
+                  <option value="desktop_input">Desktop Input</option>
+                </select>
+              </div>
+
+              <p class="helper">Changes the USB manufacturer/product strings after reboot. VID/PID remain the board defaults; profiles do not impersonate third-party vendor IDs.</p>
+
+              <div class="toolbar">
+                <button id="saveUsbIdentity" class="btn primary">Save USB identity</button>
               </div>
             </div>
           </section>
@@ -743,6 +763,8 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
               <div class="meta"><small>Local IP</small><strong id="ip">—</strong></div>
               <div class="meta"><small>Free heap</small><strong id="heap">—</strong></div>
               <div class="meta"><small>AP</small><strong id="apName">—</strong></div>
+              <div class="meta"><small>USB VID:PID</small><strong id="usbVidPid">—</strong></div>
+              <div class="meta"><small>USB serial</small><strong id="usbSerial">—</strong></div>
             </div>
 
             <div class="system-actions">
@@ -792,6 +814,9 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
       ip: byId("ip"),
       heap: byId("heap"),
       apName: byId("apName"),
+      usbIdentity: byId("usbIdentity"),
+      usbVidPid: byId("usbVidPid"),
+      usbSerial: byId("usbSerial"),
       footerVersion: byId("footerVersion"),
       restartNotice: byId("restartNotice"),
       toast: byId("toast")
@@ -924,6 +949,8 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
         els.ip.textContent = s.ip || "—";
         els.heap.textContent = formatBytes(s.free_heap);
         els.apName.textContent = s.ap_ssid || "—";
+        els.usbVidPid.textContent = s.usb_vid_pid || "—";
+        els.usbSerial.textContent = s.usb_serial || "—";
 
         if (!hydrated) {
           els.min.value = s.min_sec;
@@ -932,6 +959,7 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
           els.ampValue.textContent = s.amplitude;
           els.session.value = String(s.session_min);
           els.ssid.value = s.ap_ssid || "";
+          els.usbIdentity.value = s.usb_identity || "gremlino";
           setIntensity(s.intensity);
           hydrated = true;
         }
@@ -1012,6 +1040,19 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
         showToast("Network settings saved");
       } catch (error) {
         showToast(error.message || "Could not save network", true);
+      }
+    });
+
+    byId("saveUsbIdentity").addEventListener("click", async () => {
+      try {
+        await post("/api/usb", {
+          profile:els.usbIdentity.value
+        });
+
+        els.restartNotice.classList.add("show");
+        showToast("USB identity saved");
+      } catch (error) {
+        showToast(error.message || "Could not save USB identity", true);
       }
     });
 
