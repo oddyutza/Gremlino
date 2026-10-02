@@ -40,7 +40,9 @@ jobs:
 
       - name: Stage standalone flash bundle
         run: |
-          cp .pio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin .pio/build/lolin_s2_mini/boot_app0.bin
+          BOOT_APP0="$(find "$HOME/.platformio/packages" -path '*/tools/partitions/boot_app0.bin' -print -quit)"
+          test -n "$BOOT_APP0"
+          cp "$BOOT_APP0" .pio/build/lolin_s2_mini/boot_app0.bin
           cat > .pio/build/lolin_s2_mini/FLASH_WITH_ESPTOOL.txt <<'EOF'
           Gremlino ESP32-S2 manual flash
           
