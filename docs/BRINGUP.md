@@ -1,6 +1,6 @@
-# Gremlino hardware bring-up
+# Gremlino 1.0 hardware acceptance
 
-Use this checklist for the first ESP32-S2 Mini board.
+Use this checklist when the ESP32-S2 Mini arrives.
 
 ## 1. Identify the board
 
@@ -8,101 +8,102 @@ Confirm:
 
 - ESP32-S2 MCU
 - 4 MB flash
-- native USB wired to the USB-C connector
+- native USB wired to USB-C
 - BOOT button on GPIO0
 - PlatformIO profile `lolin_s2_mini` is compatible with the clone
 
-## 2. First flash
-
-Build and upload:
+## 2. Build and flash
 
 ```bash
 pio run
 pio run -t upload
 ```
 
-If the board does not enter the bootloader automatically:
+If automatic bootloader entry fails:
 
 1. hold **BOOT**;
 2. tap **RESET** or reconnect USB;
 3. release **BOOT**;
-4. retry the upload.
+4. retry upload.
 
 ## 3. Serial sanity
-
-Open:
 
 ```bash
 pio device monitor
 ```
 
-Expected boot information includes:
+Expected output includes:
 
-- `Gremlino ready`
-- an AP name like `Gremlino-1A2B`
+- `Gremlino 1.0.0 ready`
+- AP name such as `Gremlino-1A2B`
 - local IP `192.168.4.1`
 
-## 4. Wi-Fi / UI
+## 4. Wi-Fi and captive portal
 
-- connect to the Gremlino AP;
-- default password is `gremlino!`;
-- verify the captive portal opens;
-- otherwise browse to `http://192.168.4.1/`;
-- confirm the dashboard renders correctly on both desktop and phone.
+- join the Gremlino AP using `gremlino!`;
+- confirm the captive portal opens;
+- otherwise open `http://192.168.4.1/`;
+- confirm the UI renders correctly on desktop and phone;
+- change SSID/password in the Device section;
+- reboot and confirm the new credentials apply.
 
 ## 5. USB HID
 
-Keep both modes OFF initially.
+Keep both automatic modes OFF.
 
-Confirm the dashboard reaches:
+Confirm:
 
 - **USB: Active**
 - **HID: Ready**
 
-Then use **Test nudge** once and verify that the pointer moves and returns.
+Run **Test nudge** and verify the pointer moves then returns.
+
+Run **Orbit** and verify the pattern closes near its starting point.
 
 ## 6. Away Killer
 
-Start conservatively:
+Start with:
 
 - minimum: 20 s
 - maximum: 40 s
 - amplitude: 2 px
 
-Verify several cycles before increasing amplitude.
+Verify multiple cycles and confirm the next-action countdown updates.
 
-## 7. Panic button
-
-While a mode is active, press BOOT once.
-
-Expected result:
-
-- Away Killer OFF
-- Gremlin Mode OFF
-- no further scheduled movement
-
-## 8. Gremlin Mode
+## 7. Gremlin Mode
 
 Test in order:
 
 1. Mild, 15 minutes
 2. Spicy, 15 minutes
-3. Chaos, only after confirming the first two
+3. Chaos, 15 minutes
 
-Check that every orbit closes and returns the pointer to its starting area.
+Confirm the session countdown expires and the mode disables itself.
+
+## 8. Panic and recovery
+
+While a mode is active:
+
+- tap BOOT: both modes must stop;
+- hold BOOT for 7 seconds: saved settings must clear and the board must reboot.
+
+After factory reset, confirm the default `Gremlino-XXXX` AP and `gremlino!` password return.
 
 ## 9. Reboot behavior
 
-After a reboot:
+After a normal reboot:
 
-- Gremlin Mode must always be OFF;
-- Away Killer may restore its previous enabled state and saved interval settings.
+- Gremlin Mode must be OFF;
+- Away Killer may restore its saved enabled state;
+- timing and network settings must persist.
 
-## 10. Record the exact clone
+## 10. Record exact hardware behavior
 
-Once validated, update the README with:
+Update the README if the clone differs from the LOLIN profile, including:
 
-- board photo/model
-- USB VID/PID observed by the host
-- exact upload procedure
-- any board-specific quirks
+- board/model marking;
+- observed USB VID/PID;
+- upload procedure;
+- BOOT/RESET behavior;
+- any native-USB quirk;
+- captive-portal observations by OS.

@@ -1,102 +1,127 @@
 # Gremlino
 
-[![Build](https://github.com/oddyutza/Gremlino/actions/workflows/build.yml/badge.svg)](https://github.com/oddyutza/Gremlino/actions/workflows/build.yml)
+[![Build firmware](https://github.com/oddyutza/Gremlino/actions/workflows/build.yml/badge.svg)](https://github.com/oddyutza/Gremlino/actions/workflows/build.yml)
 
-**Gremlino** is a tiny ESP32-S2 USB HID mouse gadget with its own Wi-Fi hotspot and a polished local WebUI.
+**Gremlino 1.0** is a tiny ESP32-S2 USB HID mouse gadget with its own Wi-Fi hotspot and a polished local WebUI.
 
 It started from a simple idea: keep a workstation awake with tiny reversible mouse movement. Then the gremlin got Wi-Fi.
 
-## Highlights
+> Software is complete and CI-built for the `lolin_s2_mini` target. Final hardware validation is intentionally tracked separately because the exact ESP32-S2 Mini clone is still in transit.
 
-- **Away Killer** — configurable random mouse nudges followed by an exact return.
-- **Gremlin Mode** — randomized, net-zero mouse patterns with three intensity levels.
-- **Manual controls** — Nudge and Orbit from the WebUI.
-- **Local-only control** — ESP32-S2 SoftAP; no cloud and no external UI dependencies.
-- **Captive portal** — connect to the AP and open the dashboard locally.
-- **Panic button** — BOOT/GPIO0 immediately stops all activity.
-- **Status dashboard** — HID readiness, USB state, Wi-Fi clients, uptime, last action and next action.
-- **Persistent settings** — Away Killer settings survive reboot; Gremlin Mode always starts OFF.
+## Features
 
-## Hardware
+- **Away Killer** — random, configurable mouse nudges followed by an exact return.
+- **Gremlin Mode** — mouse-only randomized activity with Mild, Spicy and Chaos presets.
+- **Manual actions** — Nudge and Orbit from the dashboard.
+- **Local WebUI** — fully embedded HTML/CSS/JS; no CDN, cloud or Internet dependency.
+- **Wi-Fi SoftAP + captive portal** — connect directly to Gremlino from phone or laptop.
+- **Device settings** — change AP name/password from the WebUI.
+- **System controls** — reboot and factory reset from the WebUI.
+- **Physical recovery** — tap BOOT for panic stop; hold BOOT for 7 seconds for factory reset.
+- **Persistent configuration** — Away Killer and timing/network settings survive reboot.
+- **Safe reboot behavior** — Gremlin Mode always starts OFF after reboot.
+- **Live telemetry** — HID state, USB state, clients, uptime, next action, session time, IP and free heap.
+
+## Hardware target
 
 Initial target:
 
 - ESP32-S2 Mini / LOLIN S2 Mini compatible board
+- ESP32-S2 with native USB
 - 4 MB flash
-- native USB through USB-C
+- USB-C connected to the ESP32-S2 native USB interface
+- BOOT button on GPIO0
 
-PlatformIO board profile:
+PlatformIO target:
 
 ```ini
 board = lolin_s2_mini
+platform = espressif32@7.1.3
 ```
 
-The exact clone may differ slightly. Verify that the USB-C connector is wired to the ESP32-S2 native USB interface and that BOOT is GPIO0.
+The current PlatformIO platform resolves Arduino-ESP32 2.0.17 for this environment.
 
 ## First boot
 
-1. Flash the firmware.
-2. Plug Gremlino into the host through its native USB port.
-3. Join `Gremlino-XXXX`.
+1. Build and flash Gremlino.
+2. Connect the board to the host using its native USB port.
+3. Join the Wi-Fi network `Gremlino-XXXX`.
 4. Default AP password: `gremlino!`
-5. Open `http://192.168.4.1/` if the captive portal does not appear.
-6. Confirm HID status is **Ready**.
-7. Enable Away Killer or Gremlin Mode.
-
-Change the default password before using it outside a private environment.
+5. Open `http://192.168.4.1/` if the captive portal does not appear automatically.
+6. Confirm **USB: Active** and **HID: Ready**.
+7. Use **Test nudge** before enabling an automatic mode.
+8. Change the default Wi-Fi password in **Device → Wi-Fi access point**.
 
 ## Build
 
+Requirements:
+
+- Python 3.9+
+- PlatformIO Core 6.2.0
+
 ```bash
+python -m pip install "platformio==6.2.0"
 pio run
 pio run -t upload
 pio device monitor
 ```
 
-CI builds the `lolin_s2_mini` target on every push and pull request.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    Client[Phone / laptop] -->|Wi-Fi SoftAP| UI[Gremlino WebUI]
-    UI --> API[Local HTTP API]
-    API --> Scheduler[Scheduler + settings]
-    Panic[BOOT button] --> Scheduler
-    Scheduler --> HID[USB HID Mouse]
-    HID --> Host[Host]
-```
-
-Everything required by the UI is embedded in firmware, so it works without Internet access.
+CI is pinned to Ubuntu 24.04, Python 3.13, PlatformIO 6.2.0 and `espressif32@7.1.3`.
 
 ## Modes
 
 ### Away Killer
 
-Designed to stay out of the way:
+Designed to be boring:
 
-- random interval between configurable minimum and maximum values;
-- movement amplitude from 1 to 8 pixels;
-- every movement returns to its starting point;
-- no clicks and no keyboard events.
+- configurable 5–300 second minimum/maximum interval;
+- configurable 1–8 pixel amplitude;
+- each movement is followed by its inverse;
+- no clicks;
+- no keyboard events.
 
 ### Gremlin Mode
 
 Mouse-only randomized activity:
 
 - **Mild** — long quiet periods and small nudges;
-- **Spicy** — shorter gaps and occasional square/orbit patterns;
-- **Chaos** — more frequent activity while still using net-zero patterns;
-- optional 15 min / 1 h / 4 h timeout or until reboot;
-- always disabled after reboot.
+- **Spicy** — shorter gaps and occasional orbit patterns;
+- **Chaos** — more frequent activity while retaining net-zero movement patterns;
+- 15 min / 1 h / 4 h session timeout, or until reboot;
+- always OFF after reboot.
 
-## Web API
+## Physical button
+
+BOOT / GPIO0 has two runtime functions:
+
+- **tap** — STOP ALL immediately;
+- **hold 7 seconds** — factory reset and reboot.
+
+Factory reset clears saved Wi-Fi, mode and timing settings.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Client[Phone / laptop] -->|Wi-Fi SoftAP| UI[Embedded WebUI]
+    UI --> API[Local HTTP API]
+    API --> State[Scheduler + Preferences]
+    Boot[BOOT button] --> State
+    State --> HID[USB HID Mouse]
+    HID --> Host[Host computer]
+```
+
+## Local API
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
-| `/api/status` | GET | Device state |
-| `/api/config` | POST | Intervals, amplitude, intensity and session length |
-| `/api/action` | POST | Toggle modes, manual mouse action, STOP ALL |
+| `/api/status` | GET | Runtime/device status |
+| `/api/config` | POST | Away Killer and Gremlin settings |
+| `/api/network` | POST | AP SSID/password |
+| `/api/action` | POST | Mode toggles, manual actions, STOP ALL |
+| `/api/system` | POST | Reboot or factory reset |
+
+The API is intentionally local to the Gremlino access point.
 
 ## Project layout
 
@@ -107,21 +132,16 @@ Gremlino/
 ├── include/gremlino_config.h
 ├── src/main.cpp
 ├── src/web_ui.h
-├── .gitignore
+├── CHANGELOG.md
 ├── platformio.ini
 └── README.md
 ```
 
-## Roadmap
+## Hardware validation
 
-The first real hardware pass starts when the board arrives. The step-by-step checklist lives in [`docs/BRINGUP.md`](docs/BRINGUP.md).
+The firmware build can be validated in CI, but USB enumeration, the exact clone's BOOT wiring and captive-portal behavior require the physical board.
 
-
-- verify USB enumeration on the exact clone;
-- tune HID timings on Windows;
-- test captive portal behavior on Android/iOS/Windows;
-- add an actual UI screenshot after hardware validation;
-- refine presets based on real use.
+Use [docs/BRINGUP.md](docs/BRINGUP.md) for the hardware acceptance pass. Anything discovered there should be treated as a board-specific correction to 1.0, not missing core functionality.
 
 ---
 
