@@ -491,8 +491,8 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
         </div>
 
         <div class="range-wrap">
-          <div class="range-top"><span>Movement</span><b><span id="ampValue">2</span> px</b></div>
-          <input id="amplitude" type="range" min="1" max="8" value="2">
+          <div class="range-top"><span>Movement</span><b><span id="ampValue">16</span> px</b></div>
+          <input id="amplitude" type="range" min="1" max="127" value="16">\n          <div class="range-scale"><span>1 · subtle</span><span>32</span><span>64</span><span>127 · maximum</span></div>
         </div>
 
         <div class="toolbar">
