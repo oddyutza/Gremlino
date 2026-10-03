@@ -1,4 +1,4 @@
-# Gremlino 1.1.2 hardware acceptance
+# Gremlino 1.2.0 hardware acceptance
 
 Hardware bring-up is in progress on the physical ESP32-S2 Mini.
 
@@ -35,7 +35,7 @@ pio device monitor
 
 Expected output includes:
 
-- `Gremlino 1.1.2 ready`
+- `Gremlino 1.2.0 ready`
 - AP name such as `Gremlino-1A2B`
 - local IP `192.168.4.1`
 - active USB identity strings
@@ -108,9 +108,12 @@ Start with:
 
 - minimum: 20 s
 - maximum: 40 s
-- amplitude: 16 px (new default; configurable up to 127 px)
+- movement distance: 16 px (default; configurable up to 127 px)
+- movement speed: 5 (default; configurable 1–10)
 
-Verify multiple cycles and confirm the next-action countdown updates.
+Use **Test nudge** at several combinations, including 16 px / speed 5 and a larger distance at speed 1. Confirm the cursor visibly accelerates, travels, decelerates, pauses briefly and returns rather than teleporting.
+
+Verify multiple automatic cycles and confirm the next-action countdown updates.
 
 ## 10. Gremlin Mode
 
