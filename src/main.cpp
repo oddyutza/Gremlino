@@ -13,6 +13,7 @@
 #include "web_ui.h"
 
 USBHID Hid;
+USBCDC USBSerial;
 USBHIDMouse Mouse;
 USBHIDKeyboard Keyboard;
 
@@ -890,6 +891,7 @@ static void setupUsb() {
   USB.serialNumber(serial.c_str());
   USB.onEvent(usbEventCallback);
 
+  USBSerial.begin();
   Mouse.begin();
   Keyboard.begin();
   USB.begin();
@@ -960,7 +962,6 @@ static void updateRestart() {
 void setup() {
   pinMode(GREMLINO_BOOT_PIN, INPUT_PULLUP);
 
-  Serial.begin(115200);
   delay(50);
   randomSeed(static_cast<uint32_t>(ESP.getEfuseMac()));
 
@@ -975,11 +976,11 @@ void setup() {
     scheduleIdle();
   }
 
-  Serial.println();
-  Serial.printf("Gremlino %s ready\n", GREMLINO_VERSION);
-  Serial.printf("AP: %s\n", settings.apSsid.c_str());
-  Serial.printf("IP: %s\n", WiFi.softAPIP().toString().c_str());
-  Serial.printf("USB identity: %s / %s / %s\n", USB.manufacturerName(),
+  USBSerial.println();
+  USBSerial.printf("Gremlino %s ready\n", GREMLINO_VERSION);
+  USBSerial.printf("AP: %s\n", settings.apSsid.c_str());
+  USBSerial.printf("IP: %s\n", WiFi.softAPIP().toString().c_str());
+  USBSerial.printf("USB identity: %s / %s / %s\n", USB.manufacturerName(),
                 USB.productName(), USB.serialNumber());
 }
 
