@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.2 — 2026-10-03
+
+Away Killer movement range update.
+
+- expanded configurable mouse movement from 1–8 px to 1–127 px
+- new installations and factory-reset defaults use 16 px
+- existing saved movement values remain unchanged until edited
+- WebUI now shows scale markers up to the HID-safe 127 px maximum
+
+
 ## 1.1.1 — 2026-10-03
 
 USB identity bugfix.

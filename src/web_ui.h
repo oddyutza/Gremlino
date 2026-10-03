@@ -226,6 +226,7 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
     .range-top { display:flex; justify-content:space-between; margin-bottom:9px; color:var(--muted); font-size:11px; }
     .range-top b { color:var(--text); }
     input[type="range"] { width:100%; accent-color:var(--lime); }
+    .range-scale { display:flex; justify-content:space-between; gap:8px; margin-top:7px; color:var(--muted); font-size:10px; letter-spacing:.02em; }
 
     .segments { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
     .seg,.mini {
@@ -491,8 +492,9 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
         </div>
 
         <div class="range-wrap">
-          <div class="range-top"><span>Movement</span><b><span id="ampValue">2</span> px</b></div>
-          <input id="amplitude" type="range" min="1" max="8" value="2">
+          <div class="range-top"><span>Movement</span><b><span id="ampValue">16</span> px</b></div>
+          <input id="amplitude" type="range" min="1" max="127" value="16">
+          <div class="range-scale"><span>1 · subtle</span><span>32</span><span>64</span><span>127 · maximum</span></div>
         </div>
 
         <div class="toolbar">

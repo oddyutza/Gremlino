@@ -1,14 +1,15 @@
-# Gremlino 1.1 hardware acceptance
+# Gremlino 1.1.2 hardware acceptance
 
-Use this checklist when the ESP32-S2 Mini arrives.
+Hardware bring-up is in progress on the physical ESP32-S2 Mini.
 
 ## 1. Identify the board
 
 Confirm:
 
-- ESP32-S2 MCU
-- 4 MB flash
-- native USB wired to USB-C
+- ESP32-S2FNR2 confirmed
+- 4 MB embedded flash confirmed
+- 2 MB embedded PSRAM confirmed
+- native USB / USB-OTG wired to USB-C confirmed
 - BOOT button on GPIO0
 - PlatformIO profile `lolin_s2_mini` is compatible with the clone
 
@@ -34,7 +35,7 @@ pio device monitor
 
 Expected output includes:
 
-- `Gremlino 1.1.0 ready`
+- `Gremlino 1.1.2 ready`
 - AP name such as `Gremlino-1A2B`
 - local IP `192.168.4.1`
 - active USB identity strings
@@ -63,7 +64,7 @@ Confirm the dashboard reaches:
 - **USB: Active**
 - **HID: Mouse + Keyboard**
 
-Record the actual host-visible VID:PID, manufacturer, product and serial.
+Hardware-confirmed: VID:PID `303A:80C2`; custom manufacturer/product descriptors and stable chip-derived serial apply after reboot.
 
 ## 6. Manual mouse actions
 
@@ -107,7 +108,7 @@ Start with:
 
 - minimum: 20 s
 - maximum: 40 s
-- amplitude: 2 px
+- amplitude: 16 px (new default; configurable up to 127 px)
 
 Verify multiple cycles and confirm the next-action countdown updates.
 
