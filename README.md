@@ -2,7 +2,7 @@
 
 [![Build firmware](https://github.com/oddyutza/Gremlino/actions/workflows/build.yml/badge.svg)](https://github.com/oddyutza/Gremlino/actions/workflows/build.yml)
 
-**Gremlino 1.1.2** is a tiny ESP32-S2 USB HID mischief appliance with its own Wi-Fi hotspot and a polished local WebUI.
+**Gremlino 1.2.0** is a tiny ESP32-S2 USB HID mischief appliance with its own Wi-Fi hotspot and a polished local WebUI.
 
 It started as a mouse jiggler. Then the gremlin got Wi-Fi, a dashboard, USB identity profiles and a deliberately annoying — but tightly allowlisted — keyboard prank deck.
 
@@ -10,7 +10,7 @@ It started as a mouse jiggler. Then the gremlin got Wi-Fi, a dashboard, USB iden
 
 ## Highlights
 
-- **Away Killer** — configurable random mouse nudges from 1–127 px; new installs default to 16 px.
+- **Away Killer** — smooth, visible mouse glides from 1–127 px with configurable speed from 1–10; new installs default to 16 px / speed 5.
 - **Gremlin Mode** — randomized mouse + keyboard annoyances selected from a user-controlled Mischief Deck.
 - **Mild / Spicy / Chaos** — progressively shorter gaps and occasional 2–3 action bursts.
 - **Mischief Deck** — enable only the pranks you want; each action also has a manual test button.
@@ -45,7 +45,7 @@ The pinned platform currently resolves Arduino-ESP32 2.0.17 for this environment
 
 ## USB interfaces
 
-Gremlino 1.1.2 enumerates as a composite USB device with:
+Gremlino 1.2.0 enumerates as a composite USB device with:
 
 - USB CDC serial
 - HID mouse
@@ -65,6 +65,19 @@ The WebUI can select one of these preset identities:
 The USB serial is stable and derived from the ESP32-S2 chip ID. Identity changes apply after reboot.
 
 VID/PID remain the board-profile defaults; Gremlino does not copy real third-party vendor VID/PID pairs.
+
+## Smooth movement
+
+Away Killer no longer teleports the pointer out and back. Gremlino 1.2.0 breaks each leg into multiple HID reports and applies smoothstep acceleration/deceleration so the cursor visibly travels across the screen.
+
+- **Movement distance:** 1–127 px, default 16 px
+- **Movement speed:** 1–10, default 5
+- **Test nudge:** uses the exact selected distance and speed
+- **Automatic Away Killer:** varies each move between roughly two-thirds and the configured maximum distance
+- **Path:** adds a small curved deviation for a less mechanical trajectory
+- **Return:** targets the original relative position; host-side screen-edge clipping can still prevent a perfect visual return
+
+The speed control is intentionally presented as a simple Slow → Normal → Fast scale rather than raw timing values.
 
 ## Mischief Deck
 

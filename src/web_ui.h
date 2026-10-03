@@ -481,7 +481,7 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
           <div>
             <span class="eyebrow">Stealth</span>
             <h2>Away Killer</h2>
-            <p class="sub">A tiny reversible mouse nudge at a random interval. Nothing else.</p>
+            <p class="sub">A smooth reversible mouse glide at a random interval, with configurable distance and speed. Nothing else.</p>
           </div>
           <label class="switch" aria-label="Toggle Away Killer"><input id="idleToggle" type="checkbox"><span class="slider"></span></label>
         </div>
@@ -492,9 +492,15 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
         </div>
 
         <div class="range-wrap">
-          <div class="range-top"><span>Movement</span><b><span id="ampValue">16</span> px</b></div>
+          <div class="range-top"><span>Movement distance</span><b><span id="ampValue">16</span> px</b></div>
           <input id="amplitude" type="range" min="1" max="127" value="16">
           <div class="range-scale"><span>1 · subtle</span><span>32</span><span>64</span><span>127 · maximum</span></div>
+        </div>
+
+        <div class="range-wrap">
+          <div class="range-top"><span>Movement speed</span><b><span id="speedValue">5</span> · <span id="speedLabel">Normal</span></b></div>
+          <input id="moveSpeed" type="range" min="1" max="10" value="5">
+          <div class="range-scale"><span>1 · slow</span><span>5 · normal</span><span>10 · fast</span></div>
         </div>
 
         <div class="toolbar">
@@ -647,7 +653,7 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
 
     const els = {
       live:$("live"), liveText:$("liveText"), hid:$("hid"), usb:$("usb"), clients:$("clients"), uptime:$("uptime"),
-      idle:$("idleToggle"), gremlin:$("gremlinToggle"), min:$("minSec"), max:$("maxSec"), amp:$("amplitude"), ampValue:$("ampValue"),
+      idle:$("idleToggle"), gremlin:$("gremlinToggle"), min:$("minSec"), max:$("maxSec"), amp:$("amplitude"), ampValue:$("ampValue"), speed:$("moveSpeed"), speedValue:$("speedValue"), speedLabel:$("speedLabel"),
       session:$("session"), last:$("lastAction"), next:$("nextAction"), sessionLeft:$("sessionLeft"), modeSummary:$("modeSummary"),
       deck:$("deck"), deckCount:$("deckCount"), ssid:$("ssid"), password:$("apPassword"), usbIdentity:$("usbIdentity"),
       usbVidPid:$("usbVidPid"), usbSerial:$("usbSerial"), usbManufacturer:$("usbManufacturer"), usbProduct:$("usbProduct"),
@@ -749,12 +755,26 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
       els.deckCount.textContent=count+" selected";
     }
 
+    function movementSpeedLabel(value) {
+      value=Number(value);
+      if (value<=2) return "Slow";
+      if (value<=4) return "Relaxed";
+      if (value<=6) return "Normal";
+      if (value<=8) return "Quick";
+      return "Fast";
+    }
+
+    function renderMovementSpeed() {
+      els.speedValue.textContent=els.speed.value;
+      els.speedLabel.textContent=movementSpeedLabel(els.speed.value);
+    }
+
     async function saveConfig(quiet) {
       let min=Math.max(5,Math.min(300,Number(els.min.value||20)));
       let max=Math.max(5,Math.min(300,Number(els.max.value||40)));
       if (max<min) { const t=min; min=max; max=t; }
       els.min.value=min; els.max.value=max;
-      await post("/api/config",{min:min,max:max,amp:els.amp.value,intensity:intensity,session:els.session.value,prankmask:prankMask});
+      await post("/api/config",{min:min,max:max,amp:els.amp.value,speed:els.speed.value,intensity:intensity,session:els.session.value,prankmask:prankMask});
       if (!quiet) showToast("Settings applied");
     }
 
@@ -799,6 +819,8 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
           els.max.value=s.max_sec;
           els.amp.value=s.amplitude;
           els.ampValue.textContent=s.amplitude;
+          els.speed.value=s.move_speed||5;
+          renderMovementSpeed();
           els.session.value=String(s.session_min);
           els.ssid.value=s.ap_ssid||"";
           els.usbIdentity.value=s.usb_identity||"gremlino";
@@ -814,6 +836,7 @@ const char GREMLINO_INDEX_HTML[] PROGMEM = R"GREMLINO(
     }
 
     els.amp.addEventListener("input",() => els.ampValue.textContent=els.amp.value);
+    els.speed.addEventListener("input",renderMovementSpeed);
 
     document.querySelectorAll("[data-intensity]").forEach(button => {
       button.addEventListener("click",async () => {
