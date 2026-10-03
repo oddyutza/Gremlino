@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <math.h>
 #include <DNSServer.h>
 #include <Preferences.h>
 #include <WebServer.h>
@@ -55,6 +56,7 @@ struct Settings {
   uint16_t minSec = 20;
   uint16_t maxSec = 40;
   uint8_t amplitude = 16;
+  uint8_t movementSpeed = 5;
   uint8_t intensity = 1;
   uint16_t sessionMinutes = 60;
   uint16_t prankMask = PRANK_MASK_ALL;
@@ -200,6 +202,7 @@ static void saveSettings() {
   prefs.putUShort("minsec", settings.minSec);
   prefs.putUShort("maxsec", settings.maxSec);
   prefs.putUChar("amp", settings.amplitude);
+  prefs.putUChar("movespd", settings.movementSpeed);
   prefs.putUChar("level", settings.intensity);
   prefs.putUShort("session", settings.sessionMinutes);
   prefs.putUShort("pranks", settings.prankMask);
@@ -214,6 +217,7 @@ static void loadSettings() {
   settings.minSec = constrain(prefs.getUShort("minsec", 20), 5, 300);
   settings.maxSec = constrain(prefs.getUShort("maxsec", 40), 5, 300);
   settings.amplitude = constrain(prefs.getUChar("amp", 16), 1, 127);
+  settings.movementSpeed = constrain(prefs.getUChar("movespd", 5), 1, 10);
   settings.intensity = constrain(prefs.getUChar("level", 1), 1, 3);
   settings.prankMask = prefs.getUShort("pranks", PRANK_MASK_ALL) & PRANK_MASK_ALL;
 
@@ -272,20 +276,104 @@ static bool hidReady() {
   return Hid.ready();
 }
 
-static bool nudge(uint8_t maxAmplitude) {
+static uint16_t movementLegDurationMs(uint8_t speed) {
+  static const uint16_t durations[] = {
+      1400, 1180, 980, 810, 670, 550, 440, 340, 240, 150,
+  };
+
+  speed = constrain(speed, 1, 10);
+  return durations[speed - 1];
+}
+
+static void smoothMouseLeg(int16_t fromX, int16_t fromY, int16_t toX,
+                           int16_t toY, uint8_t speed, int8_t curvePx) {
+  const int16_t vx = toX - fromX;
+  const int16_t vy = toY - fromY;
+  const float length = sqrtf(static_cast<float>(vx * vx + vy * vy));
+  const uint8_t distance =
+      static_cast<uint8_t>(constrain(static_cast<int>(lroundf(length)), 1, 127));
+  const uint8_t steps =
+      static_cast<uint8_t>(constrain(static_cast<int>(distance / 3 + 8), 8, 42));
+  const uint16_t duration = movementLegDurationMs(speed);
+  const int16_t baseDelay = static_cast<int16_t>(duration / steps);
+
+  const float normalX = length > 0.0f ? -static_cast<float>(vy) / length : 0.0f;
+  const float normalY = length > 0.0f ? static_cast<float>(vx) / length : 0.0f;
+
+  int16_t previousX = fromX;
+  int16_t previousY = fromY;
+
+  for (uint8_t step = 1; step <= steps; ++step) {
+    const float t = static_cast<float>(step) / static_cast<float>(steps);
+    const float eased = t * t * (3.0f - 2.0f * t);  // smoothstep
+    const float arc = static_cast<float>(curvePx) * 4.0f * t * (1.0f - t);
+
+    const int16_t x = static_cast<int16_t>(
+        lroundf(static_cast<float>(fromX) + static_cast<float>(vx) * eased +
+                normalX * arc));
+    const int16_t y = static_cast<int16_t>(
+        lroundf(static_cast<float>(fromY) + static_cast<float>(vy) * eased +
+                normalY * arc));
+
+    const int16_t deltaX = x - previousX;
+    const int16_t deltaY = y - previousY;
+
+    if (deltaX != 0 || deltaY != 0) {
+      Mouse.move(static_cast<int8_t>(constrain(deltaX, -127, 127)),
+                 static_cast<int8_t>(constrain(deltaY, -127, 127)), 0);
+      previousX = x;
+      previousY = y;
+    }
+
+    const int16_t jitter = max<int16_t>(1, baseDelay / 7);
+    const int16_t stepDelay =
+        constrain(static_cast<int16_t>(baseDelay + random(-jitter, jitter + 1)),
+                  static_cast<int16_t>(3), static_cast<int16_t>(220));
+    delay(static_cast<uint32_t>(stepDelay));
+  }
+}
+
+static bool nudge(uint8_t maxAmplitude, uint8_t speed,
+                  bool useFullDistance = false) {
   if (!hidReady()) {
     return false;
   }
 
-  const int8_t magnitudeX = static_cast<int8_t>(random(1, maxAmplitude + 1));
-  const int8_t magnitudeY = static_cast<int8_t>(random(1, maxAmplitude + 1));
-  const int8_t dx = random(0, 2) ? magnitudeX : -magnitudeX;
-  const int8_t dy = random(0, 2) ? magnitudeY : -magnitudeY;
+  maxAmplitude = constrain(maxAmplitude, 1, 127);
+  speed = constrain(speed, 1, 10);
 
-  Mouse.move(dx, dy, 0);
-  delay(55);
-  Mouse.move(-dx, -dy, 0);
-  lastAction = "Mouse nudge";
+  const uint8_t minDistance =
+      static_cast<uint8_t>(max(1, static_cast<int>(maxAmplitude * 2 / 3)));
+  const uint8_t distance =
+      useFullDistance
+          ? maxAmplitude
+          : static_cast<uint8_t>(random(minDistance, maxAmplitude + 1));
+
+  const float angle =
+      static_cast<float>(random(0, 6284)) / 1000.0f;  // 0 .. ~2*pi
+  int16_t dx = static_cast<int16_t>(lroundf(cosf(angle) * distance));
+  int16_t dy = static_cast<int16_t>(lroundf(sinf(angle) * distance));
+
+  if (dx == 0 && dy == 0) {
+    dx = random(0, 2) ? distance : -static_cast<int16_t>(distance);
+  }
+
+  int8_t curveOut = 0;
+  int8_t curveBack = 0;
+  if (distance >= 12) {
+    const uint8_t curveMax =
+        static_cast<uint8_t>(constrain(static_cast<int>(distance / 12), 1, 4));
+    curveOut = static_cast<int8_t>(random(1, curveMax + 1));
+    curveBack = static_cast<int8_t>(random(1, curveMax + 1));
+    if (random(0, 2) == 0) curveOut = -curveOut;
+    if (random(0, 2) == 0) curveBack = -curveBack;
+  }
+
+  smoothMouseLeg(0, 0, dx, dy, speed, curveOut);
+  delay(static_cast<uint32_t>(random(80, 181)));
+  smoothMouseLeg(dx, dy, 0, 0, speed, curveBack);
+
+  lastAction = "Smooth mouse nudge";
   return true;
 }
 
@@ -337,7 +425,8 @@ static bool capsBlink() {
 static bool runPrankBit(uint16_t bit) {
   switch (bit) {
     case PRANK_MOUSE_NUDGE:
-      return nudge(static_cast<uint8_t>(3 + settings.intensity * 2));
+      return nudge(static_cast<uint8_t>(3 + settings.intensity * 2),
+                   settings.movementSpeed);
     case PRANK_MOUSE_ORBIT:
       return orbit(static_cast<uint8_t>(5 + settings.intensity * 3));
     case PRANK_SPACE:
@@ -588,6 +677,8 @@ static void sendStatus() {
   json += String(settings.maxSec);
   json += ",\"amplitude\":";
   json += String(settings.amplitude);
+  json += ",\"move_speed\":";
+  json += String(settings.movementSpeed);
   json += ",\"intensity\":";
   json += String(settings.intensity);
   json += ",\"session_min\":";
@@ -671,6 +762,8 @@ static void handleConfig() {
   }
 
   settings.amplitude = readClampedU8("amp", settings.amplitude, 1, 127);
+  settings.movementSpeed =
+      readClampedU8("speed", settings.movementSpeed, 1, 10);
   settings.intensity = readClampedU8("intensity", settings.intensity, 1, 3);
 
   if (server.hasArg("session")) {
@@ -765,7 +858,8 @@ static bool parseEnabled() {
 }
 
 static bool runNamedAction(const String &name) {
-  if (name == "nudge") return nudge(settings.amplitude);
+  if (name == "nudge")
+    return nudge(settings.amplitude, settings.movementSpeed, true);
   if (name == "orbit") return orbit(static_cast<uint8_t>(5 + settings.intensity * 3));
   if (name == "key_space") return runPrankBit(PRANK_SPACE);
   if (name == "key_tab") return runPrankBit(PRANK_TAB);
@@ -936,7 +1030,7 @@ static void updateSchedulers() {
   }
 
   if (settings.idleEnabled && reached(now, nextIdleAt)) {
-    if (!nudge(settings.amplitude)) {
+    if (!nudge(settings.amplitude, settings.movementSpeed)) {
       lastAction = "Away Killer waiting for HID";
     }
     scheduleIdle();
