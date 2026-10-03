@@ -54,7 +54,7 @@ struct Settings {
   bool gremlinEnabled = false;
   uint16_t minSec = 20;
   uint16_t maxSec = 40;
-  uint8_t amplitude = 2;
+  uint8_t amplitude = 16;
   uint8_t intensity = 1;
   uint16_t sessionMinutes = 60;
   uint16_t prankMask = PRANK_MASK_ALL;
@@ -213,7 +213,7 @@ static void loadSettings() {
   settings.gremlinEnabled = false;  // Never restore Gremlin Mode after reboot.
   settings.minSec = constrain(prefs.getUShort("minsec", 20), 5, 300);
   settings.maxSec = constrain(prefs.getUShort("maxsec", 40), 5, 300);
-  settings.amplitude = constrain(prefs.getUChar("amp", 2), 1, 8);
+  settings.amplitude = constrain(prefs.getUChar("amp", 16), 1, 127);
   settings.intensity = constrain(prefs.getUChar("level", 1), 1, 3);
   settings.prankMask = prefs.getUShort("pranks", PRANK_MASK_ALL) & PRANK_MASK_ALL;
 
@@ -670,7 +670,7 @@ static void handleConfig() {
     settings.maxSec = temp;
   }
 
-  settings.amplitude = readClampedU8("amp", settings.amplitude, 1, 8);
+  settings.amplitude = readClampedU8("amp", settings.amplitude, 1, 127);
   settings.intensity = readClampedU8("intensity", settings.intensity, 1, 3);
 
   if (server.hasArg("session")) {
