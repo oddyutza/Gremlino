@@ -1,6 +1,6 @@
 #pragma once
 
-#define GREMLINO_VERSION "1.1.2"
+#define GREMLINO_VERSION "1.2.0"
 
 #ifndef GREMLINO_AP_PASSWORD
 #define GREMLINO_AP_PASSWORD "gremlino!"
