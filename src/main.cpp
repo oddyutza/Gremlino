@@ -325,7 +325,8 @@ static void smoothMouseLeg(int16_t fromX, int16_t fromY, int16_t toX,
       previousY = y;
     }
 
-    const int16_t jitter = max<int16_t>(1, baseDelay / 7);
+    const int16_t jitter =
+        (baseDelay / 7) > 1 ? static_cast<int16_t>(baseDelay / 7) : 1;
     const int16_t stepDelay =
         constrain(static_cast<int16_t>(baseDelay + random(-jitter, jitter + 1)),
                   static_cast<int16_t>(3), static_cast<int16_t>(220));
