@@ -2,7 +2,7 @@
 
 [![Build firmware](https://github.com/oddyutza/Gremlino/actions/workflows/build.yml/badge.svg)](https://github.com/oddyutza/Gremlino/actions/workflows/build.yml)
 
-**Gremlino 1.1** is a tiny ESP32-S2 USB HID mischief appliance with its own Wi-Fi hotspot and a polished local WebUI.
+**Gremlino 1.1.2** is a tiny ESP32-S2 USB HID mischief appliance with its own Wi-Fi hotspot and a polished local WebUI.
 
 It started as a mouse jiggler. Then the gremlin got Wi-Fi, a dashboard, USB identity profiles and a deliberately annoying — but tightly allowlisted — keyboard prank deck.
 
@@ -10,7 +10,7 @@ It started as a mouse jiggler. Then the gremlin got Wi-Fi, a dashboard, USB iden
 
 ## Highlights
 
-- **Away Killer** — tiny reversible mouse nudges at a configurable random interval.
+- **Away Killer** — configurable random mouse nudges from 1–127 px; new installs default to 16 px.
 - **Gremlin Mode** — randomized mouse + keyboard annoyances selected from a user-controlled Mischief Deck.
 - **Mild / Spicy / Chaos** — progressively shorter gaps and occasional 2–3 action bursts.
 - **Mischief Deck** — enable only the pranks you want; each action also has a manual test button.
@@ -24,11 +24,13 @@ It started as a mouse jiggler. Then the gremlin got Wi-Fi, a dashboard, USB iden
 
 ## Hardware target
 
-Initial target:
+Validated hardware target:
 
 - ESP32-S2 Mini / LOLIN S2 Mini compatible board
-- ESP32-S2 native USB
-- 4 MB flash
+- tested clone reports ESP32-S2FNR2
+- ESP32-S2 native USB / USB-OTG
+- 4 MB embedded flash
+- 2 MB embedded PSRAM
 - USB-C connected to the ESP32-S2 native USB interface
 - BOOT button on GPIO0
 
@@ -43,7 +45,7 @@ The pinned platform currently resolves Arduino-ESP32 2.0.17 for this environment
 
 ## USB interfaces
 
-Gremlino 1.1 enumerates as a composite USB device with:
+Gremlino 1.1.2 enumerates as a composite USB device with:
 
 - USB CDC serial
 - HID mouse
