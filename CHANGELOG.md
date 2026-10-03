@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.1 — 2026-10-03
+
+USB identity bugfix.
+
+- disabled Arduino's native-USB auto-start so descriptor configuration can run before `USB.begin()`
+- firmware now owns the USB CDC interface explicitly
+- custom manufacturer, product and chip-derived serial descriptors now apply at enumeration
+- CDC + HID mouse + HID keyboard remain part of the same composite USB device
+
+
 ## 1.1.0 — 2026-10-02
 
 Keyboard mischief and Mischief Deck release.
