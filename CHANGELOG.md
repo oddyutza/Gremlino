@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0 — 2026-10-03
+
+Natural mouse movement release.
+
+- replaced Away Killer teleport-style nudge with smooth multi-step motion
+- added smoothstep acceleration/deceleration for visible cursor travel
+- added a subtle curved path so movement is less mechanically straight
+- added configurable movement speed from 1 (slow) to 10 (fast), default 5
+- movement speed persists in NVS and is exposed through the local status/config API
+- manual Test nudge uses the exact configured distance and speed
+- scheduled Away Killer movement varies between roughly two-thirds and the full configured distance
+- Gremlin mouse Nudge also uses the smooth movement engine
+- return path still targets the original relative position
+
+
 ## 1.1.2 — 2026-10-03
 
 Away Killer movement range update.
